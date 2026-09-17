@@ -23,7 +23,7 @@ const futureSteps = [
 
 export default function ProblemSection() {
   return (
-    <section className="bg-white text-black py-24 px-6 border-t border-b border-black">
+    <section id="how-it-works" className="bg-white text-black py-28 px-6 border-t border-b border-black">
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
         <div className="mb-20">

@@ -12,7 +12,7 @@ const externalAgents = [
 
 export default function CandidateNeverComesSection() {
   return (
-    <section className="bg-white text-black py-28 px-6 border-b border-black relative overflow-hidden">
+    <section id="candidate-never-comes" className="bg-white text-black py-28 px-6 border-b border-black relative overflow-hidden">
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
         <div className="mb-16">

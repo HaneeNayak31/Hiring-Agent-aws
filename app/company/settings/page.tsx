@@ -2,6 +2,7 @@
 'use client';
 
 import CompanyNav from '@/components/CompanyNav';
+import Breadcrumbs from '@/components/Breadcrumbs';
 import { Settings, Server, ShieldCheck, Save } from 'lucide-react';
 import { useState } from 'react';
 
@@ -18,6 +19,8 @@ export default function CompanySettingsPage() {
       <CompanyNav />
 
       <main className="max-w-5xl mx-auto px-6 py-10">
+        <Breadcrumbs items={[{ label: 'SETTINGS' }]} />
+
         {/* Header */}
         <div className="border-b border-white/15 pb-8 mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
           <div>

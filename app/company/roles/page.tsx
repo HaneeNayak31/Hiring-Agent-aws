@@ -2,15 +2,17 @@
 'use client';
 
 import CompanyNav from '@/components/CompanyNav';
+import Breadcrumbs from '@/components/Breadcrumbs';
 import { mockRoles, OpenRole } from '@/data/mockData';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Plus, Search, Filter, Briefcase, Server, ArrowRight, Pause, Play, Archive, Edit3, CheckCircle2 } from 'lucide-react';
-import { CreateRoleModal, ArchiveRoleDialog } from '@/components/RoleModals';
+import { Plus, Search, ArrowRight, Pause, Play, Archive, Server, MoreVertical } from 'lucide-react';
+import CreateRoleDrawer from '@/components/CreateRoleDrawer';
+import { ArchiveRoleDialog } from '@/components/RoleModals';
 import { motion } from 'framer-motion';
 
-export default function OpenRolesPage() {
+export default function RolesPage() {
   const searchParams = useSearchParams();
   const [rolesList, setRolesList] = useState<OpenRole[]>(mockRoles);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -77,6 +79,8 @@ export default function OpenRolesPage() {
       <CompanyNav />
 
       <main className="max-w-7xl mx-auto px-6 py-10">
+        <Breadcrumbs items={[{ label: 'ROLES' }]} />
+
         {/* Header */}
         <div className="border-b border-white/15 pb-8 mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
           <div>
@@ -84,10 +88,10 @@ export default function OpenRolesPage() {
               // Live Hiring Endpoints Registry
             </span>
             <h1 className="font-bold text-4xl md:text-6xl tracking-tighter uppercase font-sans">
-              OPEN ROLES
+              ROLES
             </h1>
             <p className="text-white/60 text-sm mt-1 font-mono">
-              Roles exposed to candidate AI agents through your Hiring MCP Server.
+              Requisitions exposed to candidate AI agents through your Hiring MCP Server.
             </p>
           </div>
 
@@ -106,7 +110,7 @@ export default function OpenRolesPage() {
             <Search className="w-4 h-4 text-white/40 absolute left-4 top-3.5" />
             <input
               type="text"
-              placeholder="Search role title or department..."
+              placeholder="Search roles or departments..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-white/[0.03] border border-white/20 pl-11 pr-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-primary transition"
@@ -130,7 +134,7 @@ export default function OpenRolesPage() {
           </div>
         </div>
 
-        {/* SECTION 7: EDITORIAL ROLE LIST / TABLE */}
+        {/* SECTION 7: EDITORIAL ROLE LIST */}
         <div className="space-y-4 font-mono">
           {filteredRoles.length === 0 ? (
             <div className="border border-dashed border-white/20 p-12 text-center font-mono">
@@ -217,7 +221,7 @@ export default function OpenRolesPage() {
                           title={role.status === 'OPEN' ? 'Pause Role' : 'Resume Role'}
                           className="px-2.5 py-1.5 border border-white/20 text-white hover:border-white text-xs flex items-center gap-1"
                         >
-                          {role.status === 'OPEN' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 text-emerald-400" />}
+                          {role.status === 'OPEN' ? <Pause className="w-3.5 h-3.5 text-amber-400" /> : <Play className="w-3.5 h-3.5 text-emerald-400" />}
                         </button>
 
                         <button
@@ -235,8 +239,7 @@ export default function OpenRolesPage() {
                           href={`/company/roles/${role.id}`}
                           className="px-4 py-2 bg-white text-black font-bold text-xs uppercase hover:bg-primary transition flex items-center gap-2"
                         >
-                          View Role
-                          <ArrowRight className="w-4 h-4" />
+                          OPEN ROLE →
                         </Link>
                       </div>
                     </div>
@@ -259,7 +262,7 @@ export default function OpenRolesPage() {
         </div>
       </main>
 
-      <CreateRoleModal
+      <CreateRoleDrawer
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onSave={handleCreateRole}

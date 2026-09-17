@@ -12,9 +12,7 @@ export default function Home() {
   return (
     <>
       <Hero />
-      <div id="problem">
-        <ProblemSection />
-      </div>
+      <ProblemSection />
       <CandidateNeverComesSection />
       <VisionSection />
       <CompanyControlRoomPreview />
