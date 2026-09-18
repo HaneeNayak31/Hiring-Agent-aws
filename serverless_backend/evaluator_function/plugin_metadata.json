@@ -1,0 +1,22 @@
+{
+    "git-forensics-evaluator": {
+        "source": "git_forensics_evaluator",
+        "description": "Evaluate repository Git history and development practices."
+    },
+    "interview-question-formulation": {
+        "source": "interview_question_formulation",
+        "description": "Formulate technical interview questions based on repository findings."
+    },
+    "security-and-code-smells": {
+        "source": "security_and_code_smells",
+        "description": "Evaluate source code for security issues and code smells."
+    },
+    "solid-architecture-rubric": {
+        "source": "solid_architecture_rubric",
+        "description": "Evaluate software architecture using SOLID principles."
+    },
+    "test-rigor-evaluator": {
+        "source": "test_rigor_evaluator",
+        "description": "Evaluate the quality and rigor of repository tests."
+    }
+}

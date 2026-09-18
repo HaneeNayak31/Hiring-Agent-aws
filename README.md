@@ -1,74 +1,116 @@
-# Agentic Hiring — Infrastructure for the Agent Era
+# AI-Native Hiring Platform (AWS SAM Architecture)
 
-> **Hiring infrastructure built for AI agents.**
-
-Candidates do not search or apply for jobs on our website. Candidates bring their existing AI assistants (ChatGPT, Claude, Gemini). Those AI agents connect directly to company Hiring MCP Servers. Our platform is the **Company / HR Control Room**—receiving verified applications, analyzing evidence graphs, generating candidate intelligence reports, and surfacing executive interview briefing packets.
+An evidence-first hiring platform connecting candidate AI agents (Claude, Codex, Cursor) via **Model Context Protocol (MCP)** to an automated **Docker sandbox evaluation agent**, orchestrating reports and execution traces through **AWS SAM (DynamoDB, S3, Lambda)** and a Next.js **Recruiter Flight Recorder UI**.
 
 ---
 
-## 🛠️ Technology Stack
+## Repository Structure
 
-- **Framework**: Next.js (App Router, TypeScript)
-- **Styling**: Tailwind CSS (PostCSS)
-- **UI Components & Icons**: Lucide React, Framer Motion
-- **Design Identity**: Black/White/Off-White foundation with strong Orange Accent (`#FF6A00`), Space Grotesk editorial typography, and JetBrains Mono technical metadata.
-
----
-
-## 🏛️ System Architecture & Workflow
-
+```text
+Hiring-Agent-aws/
+│
+├── frontend/                                # Next.js 13 Recruiter & Candidate Portal
+│   ├── app/                                 # Routes (recruiter candidates, brief, opportunities)
+│   ├── components/                          # UI components (evidence graphs, drawer)
+│   ├── data/                                # Mock data & types
+│   ├── package.json
+│   └── tailwind.config.js
+│
+├── serverless_backend/                      # AWS Serverless Application Model (SAM)
+│   ├── template.yaml                        # Infrastructure as Code (DynamoDB, S3, Lambdas)
+│   ├── samconfig.toml                       # SAM deployment settings
+│   ├── evaluator_function/                  # Candidate Evaluator (triggered by DynamoDB Stream)
+│   │   ├── handler.py                       # Lambda entrypoint
+│   │   ├── agent.py                         # OpenAI Agents API session factory
+│   │   ├── trace_collector.py               # Lossless trace recorder
+│   │   ├── s3_storage.py                    # S3 uploader for reports and trace.json
+│   │   ├── prompts/                         # Prompts and system instructions
+│   │   └── requirements.txt
+│   │
+│   └── api_function/                        # Recruiter REST API (FastAPI + Mangum)
+│       ├── app.py                           # /api/reports/{id}, /api/traces/{id}
+│       └── requirements.txt
+│
+├── MCP/                                     # Standalone Applicant MCP Server
+│   ├── server.py                            # FastMCP server with tools & prompts
+│   ├── db.py                                # DynamoDB adapter (Jobs & Applications)
+│   ├── models/                              # Pydantic models (passport, job, application)
+│   ├── scripts/                             # seed_dynamodb.py
+│   ├── tests/                               # Unit & integration tests
+│   └── requirements.txt
+└── package.json                             # Monorepo scripts (dev, build, mcp, sam)
 ```
-CANDIDATE
-    ↓
-Personal AI Agent (ChatGPT / Claude / Gemini)
-    ↓
-Company Hiring MCP Server (mcp.stripe.com/hiring)
-    ↓
-Company Hiring Control Room
-    ↓
-Verification Agent (GitHub / Portfolio / Resume Analysis)
-    ↓
-Evidence-backed Candidate Intelligence Report
-    ↓
-Executive Interview Briefing Dossier
-    ↓
-Human Interviewer
-```
 
 ---
 
-## 🚀 Getting Started
+## Quick Start & Developer Guide
 
-### 1. Install Dependencies
+### 1. Run the Frontend (Next.js)
 ```bash
-npm install
-```
-
-### 2. Run Local Development Server
-```bash
+cd frontend
+npm run dev
+# Or from root:
 npm run dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
----
-
-## 📂 Key Routes
-
-- `/` — Product Landing Page (10 Editorial Protocol Sections)
-- `/company` — Company Overview (Role-First Management Dashboard)
-- `/company/roles` — Open Roles Registry Workspace (CRUD, Status Management, MCP Exposure)
-- `/company/roles/[id]` — Role Detail Workspace (Interactive Funnel, Applicants, Requirements Matrix, Telemetry)
-- `/company/candidates` — Candidate Intelligence Database
-- `/company/candidates/[id]` — Candidate Evidence Workspace & Interactive Evidence Graph
-- `/company/candidates/[id]/brief` — Executive Interview Briefing Dossier (Printable)
-- `/company/reports` — Candidate Reports & Generation Workflow Simulation
-- `/company/interviews` — Interview Readiness & Briefs Manager
-- `/company/mcp` — Hiring MCP Server Control Panel & Exposed Tool Inspector
-- `/company/settings` — MCP Configuration & Verification Thresholds
+Accessible at: `http://localhost:3000`
 
 ---
 
-## 📜 License
+### 2. Run the Applicant MCP Server
+Candidate AI agents connect to this MCP server to discover jobs and apply:
+```bash
+cd MCP
+pip install -r requirements.txt
+python server.py
+# Or from root:
+npm run mcp
+```
 
-MIT License. Built for the AI Agent Era.
+---
+
+### 3. Deploy the Serverless Backend (AWS SAM)
+Once AWS SAM CLI is installed:
+```bash
+# Build functions & dependencies
+sam build
+
+# Deploy to your AWS Account
+sam deploy --guided
+```
+
+This provisions:
+- **`HiringAgent_Jobs`** DynamoDB table (with GSI `status-posted_at-index`).
+- **`HiringAgent_Applications`** DynamoDB table (with GSI `job_id-submitted_at-index` and **DynamoDB Streams**).
+- **`hiring-agent-assessments-...`** S3 bucket for markdown reports and lossless `trace.json` execution logs.
+- **`CandidateEvaluatorFunction`** Lambda listening to DynamoDB Streams to run the evaluation agent.
+- **`RecruiterApiFunction`** HTTP API for the Recruiter UI.
+
+---
+
+### 4. Seed DynamoDB Tables (Initial Roles)
+```bash
+python MCP/scripts/seed_dynamodb.py
+# Or from root:
+npm run seed:dynamodb
+```
+
+---
+
+## Architectural Workflow
+
+1. **Candidate Applies via MCP**:
+   * Candidate AI invokes `submit_application` on `MCP/server.py`.
+   * MCP server writes candidate passport to `HiringAgent_Applications` in DynamoDB.
+2. **DynamoDB Stream Fires**:
+   * The `INSERT` stream event triggers `serverless_backend/evaluator_function/handler.py`.
+   * Status updates to `EVALUATING`.
+3. **Sandbox Agent Evaluates Repo**:
+   * Clones repo, runs unit tests, static linting, and architecture analysis.
+   * `TraceCollector` captures 100% of raw events (reasoning tokens, tool calls, stdout/stderr).
+4. **Artifacts Uploaded to S3**:
+   * `candidate_intelligence_report.md` $\rightarrow$ S3.
+   * `trace.json` (dual-layer flight recorder) $\rightarrow$ S3.
+   * DynamoDB status updates to `EVALUATED`.
+5. **Recruiter Reviews Candidate**:
+   * Recruiter views Candidate Detail page.
+   * Inspects AI report, reads actual terminal logs, and audits the AI reasoning timeline.

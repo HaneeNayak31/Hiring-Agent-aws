@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  AI-Native Hiring Platform Serverless Infrastructure.
+  Declares DynamoDB Tables (Jobs & Applications with Stream), S3 Assessments Bucket,
+  the Candidate Evaluator Lambda (triggered on new applications), and the Recruiter HTTP API.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    Description: Environment stage (dev, staging, prod)
+  OpenAIApiKey:
+    Type: String
+    NoEcho: true
+    Default: "sk-mock-key"
+    Description: OpenAI API Key for candidate assessment agent
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 512
+    Runtime: python3.12
+    Environment:
+      Variables:
+        AWS_REGION: !Ref AWS::Region
+        DYNAMODB_JOBS_TABLE: !Ref JobsTable
+        DYNAMODB_APPLICATIONS_TABLE: !Ref ApplicationsTable
+        S3_ASSESSMENT_BUCKET: !Ref AssessmentsBucket
+        OPENAI_API_KEY: !Ref OpenAIApiKey
+
+Resources:
+  # ==============================================================================
+  # 1. DynamoDB Tables
+  # ==============================================================================
+  JobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: HiringAgent_Jobs
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: job_id
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: posted_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: job_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: status-posted_at-index
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: posted_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  ApplicationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: HiringAgent_Applications
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: application_id
+          AttributeType: S
+        - AttributeName: job_id
+          AttributeType: S
+        - AttributeName: submitted_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: application_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: job_id-submitted_at-index
+          KeySchema:
+            - AttributeName: job_id
+              KeyType: HASH
+            - AttributeName: submitted_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+
+  # ==============================================================================
+  # 2. S3 Bucket for Candidate Intelligence Reports & Full Trace JSON
+  # ==============================================================================
+  AssessmentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "hiring-agent-assessments-${AWS::AccountId}-${AWS::Region}"
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+              - HEAD
+            AllowedOrigins:
+              - "*"
+            MaxAge: 3000
+
+  # ==============================================================================
+  # 3. Candidate Evaluator Lambda (Triggered by DynamoDB Stream)
+  # ==============================================================================
+  CandidateEvaluatorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: HiringAgent_CandidateEvaluator
+      CodeUri: evaluator_function/
+      Handler: handler.lambda_handler
+      Timeout: 900
+      MemorySize: 1024
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ApplicationsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobsTable
+        - S3CrudPolicy:
+            BucketName: !Ref AssessmentsBucket
+      Events:
+        ApplicationStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt ApplicationsTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 1
+            FilterCriteria:
+              Filters:
+                - Pattern: '{"eventName": ["INSERT"]}'
+
+  # ==============================================================================
+  # 4. Recruiter HTTP API & Lambda Function
+  # ==============================================================================
+  RecruiterApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - "*"
+        AllowOrigins:
+          - "*"
+
+  RecruiterApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: HiringAgent_RecruiterApi
+      CodeUri: api_function/
+      Handler: app.handler
+      Timeout: 30
+      MemorySize: 512
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ApplicationsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref JobsTable
+        - S3ReadPolicy:
+            BucketName: !Ref AssessmentsBucket
+      Events:
+        ApiProxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref RecruiterApi
+            Path: /{proxy+}
+            Method: ANY
+
+Outputs:
+  RecruiterApiUrl:
+    Description: HTTP API Gateway endpoint URL for recruiter dashboard
+    Value: !Sub "https://${RecruiterApi}.execute-api.${AWS::Region}.amazonaws.com"
+  AssessmentsBucketName:
+    Description: S3 Bucket Name storing candidate intelligence reports and traces
+    Value: !Ref AssessmentsBucket
+  JobsTableName:
+    Description: DynamoDB Jobs Table Name
+    Value: !Ref JobsTable
+  ApplicationsTableName:
+    Description: DynamoDB Applications Table Name
+    Value: !Ref ApplicationsTable
+  CandidateEvaluatorFunctionArn:
+    Description: Candidate Evaluator Lambda Function ARN
+    Value: !GetAtt CandidateEvaluatorFunction.Arn

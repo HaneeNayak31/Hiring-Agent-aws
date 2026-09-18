@@ -1,12 +1,19 @@
 """
-Database abstraction layer and in-memory mock repository for jobs and candidate applications.
-Designed to easily swap with PostgreSQL / Prisma later.
+Database abstraction layer and DynamoDB repository for jobs and candidate applications.
+Connects directly to Amazon DynamoDB (with in-memory fallback for local development).
+Enables DynamoDB Streams on applications for automated sandbox agent evaluation.
 """
 
 from __future__ import annotations
+import os
 import uuid
+from decimal import Decimal
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
+import boto3
+from botocore.exceptions import ClientError, BotoCoreError
+from dotenv import load_dotenv
+
 from models.job import (
     JobSummary,
     JobDetail,
@@ -18,7 +25,15 @@ from models.passport import CandidatePassport
 from models.application import ApplicationSubmission, ApplicationReceipt
 from models.validation import ValidationResult, HighImpactRecommendation
 
-# Seed Data: 3 Real-World Roles with Detailed Descriptions & Submission Requirements
+load_dotenv()
+
+# AWS Configuration
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+ENDPOINT_URL = os.getenv("DYNAMODB_ENDPOINT_URL")
+JOBS_TABLE_NAME = os.getenv("DYNAMODB_JOBS_TABLE", "HiringAgent_Jobs")
+APPS_TABLE_NAME = os.getenv("DYNAMODB_APPLICATIONS_TABLE", "HiringAgent_Applications")
+
+# Fallback Seed Data: Used if DynamoDB is unreachable or for zero-config offline testing
 JOBS_SEED: Dict[str, JobDetail] = {
     "job-backend-01": JobDetail(
         id="job-backend-01",
@@ -27,7 +42,7 @@ JOBS_SEED: Dict[str, JobDetail] = {
         location="San Francisco, CA (or Remote US)",
         workplace_type="remote",
         employment_type="full-time",
-        experience_level="Junior ",
+        experience_level="Junior",
         min_years_experience=0,
         compensation=Compensation(
             min=16000,
@@ -35,7 +50,7 @@ JOBS_SEED: Dict[str, JobDetail] = {
             currency="USD",
             period="yearly"
         ),
-        primary_skills=["AWS","Python", "FastAPI", "PostgreSQL", "Docker", "Distributed Systems"],
+        primary_skills=["AWS", "Python", "FastAPI", "PostgreSQL", "Docker", "Distributed Systems"],
         status="active",
         posted_at="2026-09-15T09:00:00Z",
         overview=(
@@ -43,7 +58,6 @@ JOBS_SEED: Dict[str, JobDetail] = {
             "You will scale distributed event streams, design resilient data models, and optimize our low-latency APIs."
         ),
         full_description_markdown=(
-            
             "## About The Role\n"
             "We are seeking an experienced Backend Engineer to lead the architectural evolution of our event-driven systems. "
             "You will work closely with AI infrastructure engineers, designing APIs handling millions of requests per day.\n\n"
@@ -71,8 +85,15 @@ JOBS_SEED: Dict[str, JobDetail] = {
             "Unlimited PTO and paid parental leave"
         ],
         submission_requirements=SubmissionRequirements(
-            mandatory_fields=["fullName", "email", "skills", "experience", "projects", "repositoryUrl",
-                "education (college, degree, cgpa, 10th result, 12th result)",
+            mandatory_fields=[
+                "fullName", "email", "skills", "experience", "projects", "repositoryUrl"
+            ],
+            optional_fields=[
+                "education.college",
+                "education.degree",
+                "education.cgpa",
+                "education.tenth_result",
+                "education.twelfth_result",
                 "profiles.linkedin",
                 "profiles.leetcode",
                 "profiles.codeforces",
@@ -86,8 +107,8 @@ JOBS_SEED: Dict[str, JobDetail] = {
             ],
             min_projects=1,
             requires_code_repository=True,
-            required_profiles=["github""linkedin", "leetcode"],
-            optional_profiles=["codeforces", "codechef", "portfolio"],
+            required_profiles=["github"],
+            optional_profiles=["linkedin", "leetcode", "codeforces", "codechef", "portfolio"],
             custom_questions=[
                 CustomQuestion(
                     id="q_backend_perf",
@@ -97,16 +118,46 @@ JOBS_SEED: Dict[str, JobDetail] = {
             ]
         )
     ),
-   
 }
 
-# In-memory Application Store: application_id -> record
+# In-memory Application Store (Cache & Local Fallback)
 APPLICATIONS_DB: Dict[str, Dict[str, Any]] = {}
+
+
+def _get_dynamodb_resource():
+    """Initializes and returns the boto3 DynamoDB resource."""
+    kwargs = {"region_name": AWS_REGION}
+    if ENDPOINT_URL:
+        kwargs["endpoint_url"] = ENDPOINT_URL
+    return boto3.resource("dynamodb", **kwargs)
+
+
+def _float_to_decimal(obj: Any) -> Any:
+    """Recursively convert float to Decimal for boto3 DynamoDB serialization."""
+    if isinstance(obj, float):
+        return Decimal(str(obj))
+    if isinstance(obj, dict):
+        return {k: _float_to_decimal(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_float_to_decimal(x) for x in obj]
+    return obj
+
+
+def _decimal_to_native(obj: Any) -> Any:
+    """Recursively convert DynamoDB Decimal back to standard Python int/float."""
+    if isinstance(obj, Decimal):
+        return int(obj) if obj % 1 == 0 else float(obj)
+    if isinstance(obj, dict):
+        return {k: _decimal_to_native(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_decimal_to_native(x) for x in obj]
+    return obj
 
 
 class HiringDatabase:
     """
-    Data operations for jobs and applications.
+    Data operations for jobs and applications, backed by Amazon DynamoDB
+    with automatic in-memory fallback.
     """
 
     @staticmethod
@@ -119,51 +170,73 @@ class HiringDatabase:
     ) -> List[JobSummary]:
         """
         Returns lightweight summaries of all matching active jobs.
+        Queries DynamoDB GSI 'status-posted_at-index', falling back to JOBS_SEED.
         """
+        raw_items: List[Dict[str, Any]] = []
+
+        try:
+            dynamodb = _get_dynamodb_resource()
+            table = dynamodb.Table(JOBS_TABLE_NAME)
+            
+            # Query GSI status-posted_at-index
+            response = table.query(
+                IndexName="status-posted_at-index",
+                KeyConditionExpression=boto3.dynamodb.conditions.Key("status").eq(status)
+            )
+            raw_items = response.get("Items", [])
+        except Exception as e:
+            # Fallback to local in-memory seed
+            for job in JOBS_SEED.values():
+                if not status or job.status == status:
+                    raw_items.append(job.model_dump())
+
         results: List[JobSummary] = []
-        for job in JOBS_SEED.values():
-            if status and job.status != status:
-                continue
+        for raw in raw_items:
+            item = _decimal_to_native(raw)
+            job_id = item.get("job_id") or item.get("id")
+            item["id"] = job_id
 
             # Filter by text query (matches title, department, or overview)
             if query:
                 q = query.lower()
-                title_match = q in job.title.lower()
-                dept_match = q in job.department.lower()
-                overview_match = q in job.overview.lower()
+                title_match = q in item.get("title", "").lower()
+                dept_match = q in item.get("department", "").lower()
+                overview_match = q in item.get("overview", "").lower()
                 if not (title_match or dept_match or overview_match):
                     continue
 
             # Filter by location
-            if location and location.lower() not in job.location.lower():
+            if location and location.lower() not in item.get("location", "").lower():
                 continue
 
             # Filter by workplace type (remote, hybrid, onsite)
-            if workplace_type and job.workplace_type.lower() != workplace_type.lower():
+            if workplace_type and item.get("workplace_type", "").lower() != workplace_type.lower():
                 continue
 
             # Filter by skills overlap
             if skills:
                 target_skills = {s.lower() for s in skills}
-                job_skills = {s.lower() for s in (job.primary_skills + job.required_skills)}
+                primary = item.get("primary_skills", [])
+                required = item.get("required_skills", [])
+                job_skills = {s.lower() for s in (primary + required)}
                 if not target_skills.intersection(job_skills):
                     continue
 
             # Convert to lightweight JobSummary
             results.append(
                 JobSummary(
-                    id=job.id,
-                    title=job.title,
-                    department=job.department,
-                    location=job.location,
-                    workplace_type=job.workplace_type,
-                    employment_type=job.employment_type,
-                    experience_level=job.experience_level,
-                    min_years_experience=job.min_years_experience,
-                    compensation=job.compensation,
-                    primary_skills=job.primary_skills,
-                    status=job.status,
-                    posted_at=job.posted_at
+                    id=job_id,
+                    title=item["title"],
+                    department=item["department"],
+                    location=item["location"],
+                    workplace_type=item["workplace_type"],
+                    employment_type=item.get("employment_type", "full-time"),
+                    experience_level=item.get("experience_level", "Junior"),
+                    min_years_experience=item.get("min_years_experience", 0),
+                    compensation=Compensation(**item["compensation"]),
+                    primary_skills=item.get("primary_skills", []),
+                    status=item.get("status", "active"),
+                    posted_at=item["posted_at"]
                 )
             )
         return results
@@ -171,8 +244,21 @@ class HiringDatabase:
     @staticmethod
     def get_job(job_id: str) -> Optional[JobDetail]:
         """
-        Fetches the complete JobDetail including submission requirements.
+        Fetches complete JobDetail including submission requirements from DynamoDB.
         """
+        try:
+            dynamodb = _get_dynamodb_resource()
+            table = dynamodb.Table(JOBS_TABLE_NAME)
+            response = table.get_item(Key={"job_id": job_id})
+            item = response.get("Item")
+            if item:
+                native_item = _decimal_to_native(item)
+                native_item["id"] = native_item.get("job_id") or native_item.get("id")
+                return JobDetail.model_validate(native_item)
+        except Exception:
+            pass
+
+        # Fallback to in-memory seed
         return JOBS_SEED.get(job_id)
 
     @staticmethod
@@ -182,7 +268,7 @@ class HiringDatabase:
         Distinguishes mandatory requirements from optional bonus fields, tracks status of each,
         and provides high-impact recommendations and suggested questions.
         """
-        job = JOBS_SEED.get(job_id)
+        job = HiringDatabase.get_job(job_id)
         if not job:
             return ValidationResult(
                 is_valid=False,
@@ -200,19 +286,16 @@ class HiringDatabase:
         # -------------------------------------------------------------
         # 1. Mandatory Fields Evaluation
         # -------------------------------------------------------------
-        # Full Name
         name_valid = bool(passport.full_name and passport.full_name.strip())
         mandatory_status["fullName"] = name_valid
         if "fullName" in reqs.mandatory_fields and not name_valid:
             missing.append("fullName (candidate's name is required)")
 
-        # Email
         email_valid = bool(passport.email and "@" in passport.email)
         mandatory_status["email"] = email_valid
         if "email" in reqs.mandatory_fields and not email_valid:
             missing.append("email (valid email address required)")
 
-        # Skills
         skills_valid = bool(passport.skills and len(passport.skills) > 0)
         mandatory_status["skills"] = skills_valid
         candidate_skill_names = {s.name.lower() for s in passport.skills} if passport.skills else set()
@@ -228,13 +311,11 @@ class HiringDatabase:
                 f"Candidate passport is missing direct matches for required skills: {', '.join(unmatched)}"
             )
 
-        # Experience
         exp_valid = bool(passport.experience and len(passport.experience) > 0)
         mandatory_status["experience"] = exp_valid
         if "experience" in reqs.mandatory_fields and not exp_valid:
             missing.append("experience (employment history required)")
 
-        # Projects & Sandbox Repository Requirements
         projects_valid = len(passport.projects) >= reqs.min_projects
         mandatory_status["projects"] = projects_valid
         if "projects" in reqs.mandatory_fields and not projects_valid:
@@ -254,7 +335,6 @@ class HiringDatabase:
                     "repositoryUrl (a valid public Git repository URL is mandatory for automated sandbox verification)"
                 )
 
-        # Mandatory Profiles
         for req_prof in reqs.required_profiles:
             prof_val = getattr(passport.profiles, req_prof.lower(), None)
             prof_valid = bool(prof_val and str(prof_val).strip())
@@ -267,7 +347,6 @@ class HiringDatabase:
         # -------------------------------------------------------------
         # 2. Optional Fields Tracking
         # -------------------------------------------------------------
-        # Education details
         has_college = bool(any(e.institution and e.institution.strip() for e in passport.education))
         has_degree = bool(any(e.degree and e.degree.strip() for e in passport.education))
         has_cgpa = bool(passport.cgpa is not None or any(e.cgpa is not None for e in passport.education))
@@ -280,14 +359,12 @@ class HiringDatabase:
         optional_status["education.tenth_result"] = has_tenth
         optional_status["education.twelfth_result"] = has_twelfth
 
-        # Profiles & competitive coding
         optional_status["profiles.linkedin"] = bool(passport.profiles.linkedin)
         optional_status["profiles.leetcode"] = bool(passport.profiles.leetcode)
         optional_status["profiles.codeforces"] = bool(passport.profiles.codeforces)
         optional_status["profiles.codechef"] = bool(passport.profiles.codechef)
         optional_status["profiles.portfolio"] = bool(passport.profiles.portfolio)
 
-        # Contact & summary
         optional_status["phone"] = bool(passport.phone and passport.phone.strip())
         optional_status["location"] = bool(passport.location and passport.location.strip())
         optional_status["summary"] = bool(passport.summary and passport.summary.strip())
@@ -300,13 +377,11 @@ class HiringDatabase:
         recommendations: List[HighImpactRecommendation] = []
         suggested_questions: List[str] = []
 
-        # A. Identity & Contact (Max 20 pts)
         if name_valid:
             score += 10
         if email_valid:
             score += 10
 
-        # B. Skills Overlap (Max 20 pts)
         if skills_valid:
             score += 5
             matched_count = len(job.required_skills) - len(unmatched)
@@ -325,7 +400,6 @@ class HiringDatabase:
                 f"Do you have practical experience with {', '.join(unmatched[:2])} that we should add to your skills profile?"
             )
 
-        # C. Experience (Max 15 pts)
         if exp_valid:
             score += 15
         elif "experience" in reqs.mandatory_fields:
@@ -333,7 +407,6 @@ class HiringDatabase:
                 "Could you share your recent employment history (company, role title, and key achievements)?"
             )
 
-        # D. Projects & Sandbox Code Repository (Max 25 pts)
         if passport.projects:
             score += 10
         if valid_repo:
@@ -353,7 +426,6 @@ class HiringDatabase:
                 "Do you have a public GitHub repository with runnable unit tests that showcases your work for this role?"
             )
 
-        # E. Academic Background / Education (Optional Bonus: Max 10 pts)
         edu_score = 0
         if has_college and has_degree:
             edu_score += 4
@@ -362,16 +434,13 @@ class HiringDatabase:
 
         if has_cgpa:
             edu_score += 2
-
         if has_tenth:
             edu_score += 2
-
         if has_twelfth:
             edu_score += 2
 
         score += min(edu_score, 10)
 
-        # Education recommendations & suggested questions
         if not (has_college and has_degree):
             recommendations.append(
                 HighImpactRecommendation(
@@ -388,7 +457,6 @@ class HiringDatabase:
                 "[OPTIONAL] Would you like to add your CGPA and 10th/12th board marks or percentages to complete your academic record?"
             )
 
-        # F. Profiles & Competitive Programming (Optional Bonus: Max 10 pts)
         profile_score = 0
         if passport.profiles.github:
             profile_score += 4
@@ -413,13 +481,10 @@ class HiringDatabase:
 
         if passport.profiles.leetcode:
             profile_score += 2
-
         if passport.profiles.codeforces:
             profile_score += 1
-
         if passport.profiles.codechef:
             profile_score += 1
-
         if passport.profiles.portfolio:
             profile_score += 1
 
@@ -437,7 +502,6 @@ class HiringDatabase:
                 "[OPTIONAL] Do you have any competitive coding profiles (LeetCode, Codeforces, CodeChef) or a portfolio website you would like to include?"
             )
 
-        # G. Screening Questions
         if reqs.custom_questions:
             for cq in reqs.custom_questions:
                 if cq.required:
@@ -445,9 +509,6 @@ class HiringDatabase:
                         f"Screening Question: '{cq.question}'"
                     )
 
-        # -------------------------------------------------------------
-        # 4. Tier Assignment & Summary
-        # -------------------------------------------------------------
         if not is_valid:
             readiness_tier = "BRONZE"
             readiness_score_pct = min(score, 59)
@@ -460,7 +521,7 @@ class HiringDatabase:
             readiness_score_pct = min(max(score, 60), 84)
             readiness_summary = (
                 f"Application eligible but not optimized (Silver Tier - {readiness_score_pct}%). "
-                "All mandatory requirements met. Providing an automated unit test repo, college/CGPA, or competitive coding profiles (LeetCode/Codeforces/CodeChef) will elevate you to Gold Tier."
+                "All mandatory requirements met. Providing an automated unit test repo, college/CGPA, or competitive coding profiles will elevate you to Gold Tier."
             )
         else:
             readiness_tier = "GOLD"
@@ -496,36 +557,32 @@ class HiringDatabase:
     @staticmethod
     def submit_application(submission: ApplicationSubmission) -> ApplicationReceipt:
         """
-        Validates, records, and queues an application for the sandbox verification pipeline.
+        Validates, records, and writes candidate application into DynamoDB 'HiringAgent_Applications'.
         Enforces human-in-the-loop candidate confirmation.
+        This PutItem operation triggers DynamoDB Streams for Phase 2 sandbox evaluation.
         """
-        job = JOBS_SEED.get(submission.job_id)
+        job = HiringDatabase.get_job(submission.job_id)
         if not job:
             raise ValueError(f"Job '{submission.job_id}' not found.")
 
-        # Human-in-the-loop check
         if not submission.confirmed_by_candidate:
             raise ValueError(
                 "Human confirmation required: candidate must explicitly approve submission before filing."
             )
 
-        # Pre-flight passport validation
         val_result = HiringDatabase.validate_passport(submission.job_id, submission.candidate_passport)
         if not val_result.is_valid:
             raise ValueError(f"Application incomplete: missing {', '.join(val_result.missing_fields)}")
 
-        # Check required custom questions
         if job.submission_requirements.custom_questions:
             answers = submission.custom_answers or {}
             for cq in job.submission_requirements.custom_questions:
                 if cq.required and (cq.id not in answers or not answers[cq.id].strip()):
                     raise ValueError(f"Required screening question missing answer: '{cq.question}' (ID: {cq.id})")
 
-        # Generate unique application ID
         app_id = f"app-{uuid.uuid4().hex[:8]}"
         now_iso = datetime.now(timezone.utc).isoformat()
 
-        # Save to DB
         record = {
             "application_id": app_id,
             "job_id": submission.job_id,
@@ -534,12 +591,25 @@ class HiringDatabase:
             "cover_note": submission.cover_note,
             "custom_answers": submission.custom_answers or {},
             "status": "SUBMITTED_PENDING_SANDBOX",
+            "readiness_tier": val_result.readiness_tier,
+            "readiness_score_pct": val_result.readiness_score_pct,
             "submitted_at": now_iso,
             "verification_pipeline": {
                 "queued_at": now_iso,
                 "sandbox_status": "QUEUED"
             }
         }
+
+        # Write to DynamoDB
+        try:
+            dynamodb = _get_dynamodb_resource()
+            table = dynamodb.Table(APPS_TABLE_NAME)
+            table.put_item(Item=_float_to_decimal(record))
+        except Exception as e:
+            # Keep local in-memory fallback updated
+            APPLICATIONS_DB[app_id] = record
+
+        # Also store in local cache
         APPLICATIONS_DB[app_id] = record
 
         return ApplicationReceipt(
@@ -558,8 +628,26 @@ class HiringDatabase:
     @staticmethod
     def get_application_status(application_id: str) -> Optional[Dict[str, Any]]:
         """
-        Fetches current state of an application.
+        Fetches processing status and sandbox verification stage for a submitted application.
         """
+        try:
+            dynamodb = _get_dynamodb_resource()
+            table = dynamodb.Table(APPS_TABLE_NAME)
+            response = table.get_item(Key={"application_id": application_id})
+            item = response.get("Item")
+            if item:
+                app = _decimal_to_native(item)
+                return {
+                    "application_id": app["application_id"],
+                    "job_id": app["job_id"],
+                    "job_title": app["job_title"],
+                    "status": app["status"],
+                    "submitted_at": app["submitted_at"],
+                    "sandbox_status": app.get("verification_pipeline", {}).get("sandbox_status", "UNKNOWN")
+                }
+        except Exception:
+            pass
+
         app = APPLICATIONS_DB.get(application_id)
         if not app:
             return None
@@ -571,3 +659,84 @@ class HiringDatabase:
             "submitted_at": app["submitted_at"],
             "sandbox_status": app.get("verification_pipeline", {}).get("sandbox_status", "UNKNOWN")
         }
+
+    @staticmethod
+    def list_applications_for_job(job_id: str) -> List[Dict[str, Any]]:
+        """
+        Queries all candidate applications submitted for a specific job requisition.
+        Powers the Recruiter / HR applicants pipeline.
+        """
+        try:
+            dynamodb = _get_dynamodb_resource()
+            table = dynamodb.Table(APPS_TABLE_NAME)
+            response = table.query(
+                IndexName="job_id-submitted_at-index",
+                KeyConditionExpression=boto3.dynamodb.conditions.Key("job_id").eq(job_id)
+            )
+            items = response.get("Items", [])
+            return [_decimal_to_native(item) for item in items]
+        except Exception:
+            # In-memory fallback
+            return [
+                app for app in APPLICATIONS_DB.values()
+                if app.get("job_id") == job_id
+            ]
+
+    @staticmethod
+    def get_application(application_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetches the complete candidate application record.
+        """
+        try:
+            dynamodb = _get_dynamodb_resource()
+            table = dynamodb.Table(APPS_TABLE_NAME)
+            response = table.get_item(Key={"application_id": application_id})
+            item = response.get("Item")
+            if item:
+                return _decimal_to_native(item)
+        except Exception:
+            pass
+        return APPLICATIONS_DB.get(application_id)
+
+    @staticmethod
+    def update_application_evaluation(
+        application_id: str,
+        report_s3_url: str,
+        trace_s3_url: str,
+        evaluation_summary: Dict[str, Any]
+    ) -> bool:
+        """
+        Updates an application record post-sandbox evaluation with S3 links and metrics.
+        """
+        now_iso = datetime.now(timezone.utc).isoformat()
+        try:
+            dynamodb = _get_dynamodb_resource()
+            table = dynamodb.Table(APPS_TABLE_NAME)
+            table.update_item(
+                Key={"application_id": application_id},
+                UpdateExpression="""
+                    SET #status = :status,
+                        report_s3_url = :r_url,
+                        trace_s3_url = :t_url,
+                        evaluated_at = :eval_at,
+                        evaluation_summary = :summary,
+                        verification_pipeline.sandbox_status = :s_status
+                """,
+                ExpressionAttributeNames={"#status": "status"},
+                ExpressionAttributeValues={
+                    ":status": "EVALUATED",
+                    ":r_url": report_s3_url,
+                    ":t_url": trace_s3_url,
+                    ":eval_at": now_iso,
+                    ":summary": _float_to_decimal(evaluation_summary),
+                    ":s_status": "COMPLETED"
+                }
+            )
+            return True
+        except Exception:
+            if application_id in APPLICATIONS_DB:
+                APPLICATIONS_DB[application_id]["status"] = "EVALUATED"
+                APPLICATIONS_DB[application_id]["report_s3_url"] = report_s3_url
+                APPLICATIONS_DB[application_id]["trace_s3_url"] = trace_s3_url
+                APPLICATIONS_DB[application_id]["evaluation_summary"] = evaluation_summary
+            return True

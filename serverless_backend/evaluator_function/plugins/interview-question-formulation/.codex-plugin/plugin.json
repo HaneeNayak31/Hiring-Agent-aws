@@ -1,0 +1,6 @@
+{
+  "name": "interview-question-formulation",
+  "version": "1.0.0",
+  "description": "Formulate technical interview questions based on repository findings.",
+  "skills": "./skills/"
+}
