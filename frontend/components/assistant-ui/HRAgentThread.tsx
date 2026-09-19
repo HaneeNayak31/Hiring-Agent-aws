@@ -1,7 +1,25 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertCircle, Bot, Check, ChevronDown, CircleDot, Clipboard, Clock3, Command, Cpu, FileText, GitBranch, Layers3, Loader2, Search, Server, Wrench, X } from 'lucide-react';
+import {
+  AlertCircle,
+  Bot,
+  Check,
+  ChevronDown,
+  CircleDot,
+  Clipboard,
+  Clock3,
+  Command,
+  Cpu,
+  FileText,
+  GitBranch,
+  Layers3,
+  Loader2,
+  Search,
+  Server,
+  Wrench,
+  X,
+} from 'lucide-react';
 import { AgentSessionState } from './types';
 import { normalizeTrace } from './traceAdapter';
 import { NormalizedTrace, TraceAttributeValue, TraceSpan, TraceSpanKind } from './traceTypes';
@@ -21,49 +39,423 @@ interface HRAgentThreadProps {
 }
 
 type Filter = 'all' | TraceSpanKind | 'errors';
+
 const meta: Record<TraceSpanKind, { label: string; icon: typeof Bot; color: string }> = {
-  agent: { label: 'Agent', icon: Bot, color: 'text-violet-300' },
-  generation: { label: 'Generation', icon: Cpu, color: 'text-sky-300' },
-  tool: { label: 'Tool call', icon: Wrench, color: 'text-amber-300' },
+  agent: { label: 'Agent', icon: Bot, color: 'text-violet-400' },
+  generation: { label: 'Generation', icon: Cpu, color: 'text-primary' },
+  tool: { label: 'Tool call', icon: Wrench, color: 'text-amber-400' },
   unknown: { label: 'Span', icon: CircleDot, color: 'text-white/50' },
 };
 
-function duration(ms: number) { if (ms < 1) return '<1 ms'; if (ms < 1000) return `${Math.round(ms)} ms`; return `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)} s`; }
-function number(value: number | null) { return value === null ? '—' : new Intl.NumberFormat('en-US').format(value); }
-function valueText(value: TraceAttributeValue) { return typeof value === 'string' ? value : JSON.stringify(value, null, 2); }
-function flatten(spans: TraceSpan[]): TraceSpan[] { return spans.flatMap((span) => [span, ...flatten(span.children)]); }
-function SpanIcon({ kind }: { kind: TraceSpanKind }) { const Icon = meta[kind].icon; return <Icon className={`h-4 w-4 ${meta[kind].color}`} strokeWidth={1.8} />; }
+function duration(ms: number) {
+  if (ms < 1) return '<1 ms';
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  return `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)} s`;
+}
+
+function number(value: number | null) {
+  return value === null ? '—' : new Intl.NumberFormat('en-US').format(value);
+}
+
+function valueText(value: TraceAttributeValue) {
+  return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+}
+
+function flatten(spans: TraceSpan[]): TraceSpan[] {
+  return spans.flatMap((span) => [span, ...flatten(span.children)]);
+}
+
+function SpanIcon({ kind }: { kind: TraceSpanKind }) {
+  const Icon = meta[kind].icon;
+  return <Icon className={`h-4 w-4 ${meta[kind].color}`} strokeWidth={1.8} />;
+}
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
-  return <button type="button" aria-label="Copy value" onClick={() => { void navigator.clipboard?.writeText(value); setCopied(true); window.setTimeout(() => setCopied(false), 1200); }} className="inline-flex h-7 items-center gap-1.5 rounded-md border border-white/10 px-2 text-[10px] text-white/50 transition hover:border-white/25 hover:text-white">{copied ? <Check className="h-3 w-3 text-emerald-300" /> : <Clipboard className="h-3 w-3" />}{copied ? 'Copied' : 'Copy'}</button>;
+  return (
+    <button
+      type="button"
+      aria-label="Copy value"
+      onClick={() => {
+        void navigator.clipboard?.writeText(value);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1200);
+      }}
+      className="inline-flex h-7 items-center gap-1.5 rounded-sharp border border-white/10 px-2 text-[10px] text-white/50 transition hover:border-white/25 hover:text-white"
+    >
+      {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Clipboard className="h-3 w-3" />}
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
 }
 
 function ValueBlock({ label, value }: { label: string; value: TraceAttributeValue }) {
-  const text = valueText(value); const [expanded, setExpanded] = useState(false); const long = text.length > 520;
-  return <div className="border-t border-white/[0.08] py-3 first:border-t-0"><div className="mb-2 flex items-center justify-between gap-3"><span className="truncate font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">{label}</span><CopyButton value={text} /></div><pre className={`overflow-auto whitespace-pre-wrap break-words rounded-md border border-white/[0.08] bg-black/30 p-3 font-mono text-[11px] leading-5 text-white/75 ${!expanded && long ? 'max-h-32' : 'max-h-[28rem]'}`}>{text}</pre>{long && <button type="button" onClick={() => setExpanded((current) => !current)} className="mt-2 text-[10px] font-medium text-sky-300 hover:text-white">{expanded ? 'Show less' : `Show full value (${text.length.toLocaleString()} chars)`}</button>}</div>;
+  const text = valueText(value);
+  const [expanded, setExpanded] = useState(false);
+  const long = text.length > 520;
+  return (
+    <div className="border-t border-white/[0.08] py-3 first:border-t-0">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="truncate font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">{label}</span>
+        <CopyButton value={text} />
+      </div>
+      <pre
+        className={`overflow-auto whitespace-pre-wrap break-words rounded-sharp border border-white/[0.08] bg-black/50 p-3 font-mono text-[11px] leading-5 text-white/75 ${
+          !expanded && long ? 'max-h-32' : 'max-h-[28rem]'
+        }`}
+      >
+        {text}
+      </pre>
+      {long && (
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="mt-2 text-[10px] font-medium text-primary hover:text-white"
+        >
+          {expanded ? 'Show less' : `Show full value (${text.length.toLocaleString()} chars)`}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function DetailPanel({ span, onClose }: { span: TraceSpan; onClose: () => void }) {
   const [section, setSection] = useState<'payload' | 'attributes'>('payload');
   const entries = Object.entries(span.attributes);
-  const payload = entries.filter(([key]) => key.includes('messages') || key.includes('call.') || key.includes('instructions'));
+  const payload = entries.filter(
+    ([key]) => key.includes('messages') || key.includes('call.') || key.includes('instructions')
+  );
   const attributes = entries.filter(([key]) => !payload.some(([payloadKey]) => payloadKey === key));
   const visible = section === 'payload' ? payload : attributes;
-  return <aside className="flex min-h-0 w-full flex-col border-l border-white/10 bg-[#111318] xl:w-[430px]"><div className="flex items-start justify-between border-b border-white/10 px-5 py-4"><div className="min-w-0"><div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-white/40"><SpanIcon kind={span.kind} /> {meta[span.kind].label}</div><h3 className="truncate text-sm font-semibold text-white">{span.name}</h3><p className="mt-1 font-mono text-[10px] text-white/35">span {span.id}</p></div><button type="button" onClick={onClose} className="rounded-md p-1.5 text-white/40 transition hover:bg-white/10 hover:text-white" aria-label="Close span details"><X className="h-4 w-4" /></button></div><div className="grid grid-cols-2 gap-px border-b border-white/10 bg-white/10 text-[11px]"><div className="bg-[#111318] px-5 py-3"><div className="text-white/35">Duration</div><div className="mt-1 font-mono text-white/80">{duration(span.durationMs)}</div></div><div className="bg-[#111318] px-5 py-3"><div className="text-white/35">Status</div><div className={`mt-1 font-mono ${span.status === 'error' ? 'text-red-300' : 'text-emerald-300'}`}>{span.status}</div></div></div><div className="flex border-b border-white/10 px-4 pt-3">{(['payload', 'attributes'] as const).map((tab) => <button key={tab} type="button" onClick={() => setSection(tab)} className={`border-b-2 px-3 pb-3 text-[10px] font-semibold uppercase tracking-[0.12em] transition ${section === tab ? 'border-sky-300 text-white' : 'border-transparent text-white/40 hover:text-white/70'}`}>{tab} ({tab === 'payload' ? payload.length : attributes.length})</button>)}</div><div className="min-h-0 flex-1 overflow-y-auto px-5">{visible.length === 0 ? <div className="py-8 text-center text-xs text-white/35">No recorded {section} on this span.</div> : visible.map(([key, value]) => <ValueBlock key={key} label={key} value={value} />)}</div></aside>;
+
+  return (
+    <aside className="flex min-h-0 w-full flex-col border-l border-white/15 bg-black xl:w-[430px]">
+      <div className="flex items-start justify-between border-b border-white/15 px-5 py-4">
+        <div className="min-w-0">
+          <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-white/40">
+            <SpanIcon kind={span.kind} /> {meta[span.kind].label}
+          </div>
+          <h3 className="truncate text-sm font-semibold text-white">{span.name}</h3>
+          <p className="mt-1 font-mono text-[10px] text-white/35">span {span.id}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-sharp p-1.5 text-white/40 transition hover:bg-white/10 hover:text-white"
+          aria-label="Close span details"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-px border-b border-white/15 bg-white/10 text-[11px]">
+        <div className="bg-[#0a0a0c] px-5 py-3">
+          <div className="text-white/35">Duration</div>
+          <div className="mt-1 font-mono text-white/80">{duration(span.durationMs)}</div>
+        </div>
+        <div className="bg-[#0a0a0c] px-5 py-3">
+          <div className="text-white/35">Status</div>
+          <div className={`mt-1 font-mono ${span.status === 'error' ? 'text-red-400' : 'text-emerald-400'}`}>
+            {span.status}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex border-b border-white/15 px-4 pt-3">
+        {(['payload', 'attributes'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setSection(tab)}
+            className={`border-b-2 px-3 pb-3 text-[10px] font-semibold uppercase tracking-[0.12em] transition ${
+              section === tab ? 'border-primary text-primary' : 'border-transparent text-white/40 hover:text-white/70'
+            }`}
+          >
+            {tab} ({tab === 'payload' ? payload.length : attributes.length})
+          </button>
+        ))}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-5">
+        {visible.length === 0 ? (
+          <div className="py-8 text-center text-xs text-white/35">No recorded {section} on this span.</div>
+        ) : (
+          visible.map(([key, value]) => <ValueBlock key={key} label={key} value={value} />)
+        )}
+      </div>
+    </aside>
+  );
 }
 
-function SpanRow({ span, selected, selectedId, onSelect }: { span: TraceSpan; selected: boolean; selectedId?: string | null; onSelect: () => void }) {
-  const [expanded, setExpanded] = useState(false); const hasChildren = span.children.length > 0;
-  return <div className="relative" style={{ marginLeft: `${Math.min(span.depth, 5) * 22}px` }}>{span.depth > 0 && <div className="absolute -left-[15px] top-0 h-1/2 w-px bg-white/10" />}<div className={`group flex items-center gap-3 border-b border-white/[0.06] px-3 py-3 transition ${selected ? 'bg-sky-300/[0.08]' : 'hover:bg-white/[0.035]'}`}><button type="button" onClick={() => hasChildren && setExpanded((current) => !current)} className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-white/40 ${hasChildren ? 'hover:bg-white/10 hover:text-white' : 'cursor-default'}`} aria-label={hasChildren ? (expanded ? 'Collapse children' : 'Expand children') : undefined}>{hasChildren ? <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? '' : '-rotate-90'}`} /> : <span className="h-1 w-1 rounded-full bg-white/25" />}</button><div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03]"><SpanIcon kind={span.kind} /></div><button type="button" onClick={onSelect} className="min-w-0 flex-1 text-left"><div className="flex min-w-0 items-center gap-2"><span className="truncate text-xs font-medium text-white/90">{span.name}</span>{span.status === 'error' && <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-300" />}</div><div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-white/35"><span>{meta[span.kind].label}</span><span>·</span><span>{span.id.slice(0, 10)}</span></div></button><div className="hidden shrink-0 items-center gap-4 text-right sm:flex"><span className="font-mono text-[10px] text-white/35">{span.startTime?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) || '—'}</span><span className="w-14 font-mono text-[10px] text-white/55">{duration(span.durationMs)}</span></div><button type="button" onClick={onSelect} className="rounded-md p-1.5 text-white/25 opacity-0 transition group-hover:opacity-100 hover:bg-white/10 hover:text-white" aria-label="Inspect span"><GitBranch className="h-3.5 w-3.5" /></button></div>{expanded && hasChildren && <div className="border-l border-white/10">{span.children.map((child) => <SpanRow key={child.id} span={child} selected={child.id === selectedId} selectedId={selectedId} onSelect={onSelect} />)}</div>}</div>;
+function SpanRow({
+  span,
+  selected,
+  selectedId,
+  onSelect,
+}: {
+  span: TraceSpan;
+  selected: boolean;
+  selectedId?: string | null;
+  onSelect: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hasChildren = span.children.length > 0;
+
+  return (
+    <div className="relative" style={{ marginLeft: `${Math.min(span.depth, 5) * 22}px` }}>
+      {span.depth > 0 && <div className="absolute -left-[15px] top-0 h-1/2 w-px bg-white/10" />}
+      <div
+        className={`group flex items-center gap-3 border-b border-white/[0.06] px-3 py-3 transition ${
+          selected ? 'bg-primary/10 border-l-2 border-primary' : 'hover:bg-white/[0.035]'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => hasChildren && setExpanded((current) => !current)}
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-sharp text-white/40 ${
+            hasChildren ? 'hover:bg-white/10 hover:text-white' : 'cursor-default'
+          }`}
+          aria-label={hasChildren ? (expanded ? 'Collapse children' : 'Expand children') : undefined}
+        >
+          {hasChildren ? (
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+          ) : (
+            <span className="h-1 w-1 rounded-full bg-white/25" />
+          )}
+        </button>
+
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sharp border border-white/10 bg-white/[0.03]">
+          <SpanIcon kind={span.kind} />
+        </div>
+
+        <button type="button" onClick={onSelect} className="min-w-0 flex-1 text-left">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-xs font-medium text-white/90">{span.name}</span>
+            {span.status === 'error' && <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" />}
+          </div>
+          <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-white/35">
+            <span>{meta[span.kind].label}</span>
+            <span>·</span>
+            <span>{span.id.slice(0, 10)}</span>
+          </div>
+        </button>
+
+        <div className="hidden shrink-0 items-center gap-4 text-right sm:flex">
+          <span className="font-mono text-[10px] text-white/35">
+            {span.startTime?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) || '—'}
+          </span>
+          <span className="w-14 font-mono text-[10px] text-white/55">{duration(span.durationMs)}</span>
+        </div>
+
+        <button
+          type="button"
+          onClick={onSelect}
+          className="rounded-sharp p-1.5 text-white/25 opacity-0 transition group-hover:opacity-100 hover:bg-white/10 hover:text-white"
+          aria-label="Inspect span"
+        >
+          <GitBranch className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {expanded && hasChildren && (
+        <div className="border-l border-white/10">
+          {span.children.map((child) => (
+            <SpanRow
+              key={child.id}
+              span={child}
+              selected={child.id === selectedId}
+              selectedId={selectedId}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
-export default function HRAgentThread({ session, candidateName, roleTitle, repoUrl, isStreaming = false, error = null, trace, traceLoading = false, onRetry, onRunEvaluation, onOpenReport }: HRAgentThreadProps) {
+export default function HRAgentThread({
+  session,
+  candidateName,
+  roleTitle,
+  repoUrl,
+  isStreaming = false,
+  error = null,
+  trace,
+  traceLoading = false,
+  onRetry,
+  onRunEvaluation,
+  onOpenReport,
+}: HRAgentThreadProps) {
   const normalized = useMemo<NormalizedTrace>(() => normalizeTrace(trace as any), [trace]);
-  const [filter, setFilter] = useState<Filter>('all'); const [search, setSearch] = useState(''); const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>('all');
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
   const all = useMemo(() => flatten(normalized.roots), [normalized.roots]);
-  const roots = useMemo(() => { const matches = (span: TraceSpan) => (filter === 'all' || (filter === 'errors' ? span.status === 'error' : span.kind === filter)) && (!search || `${span.name} ${span.id} ${JSON.stringify(span.attributes)}`.toLowerCase().includes(search.toLowerCase())); const visible = new Set(all.filter(matches).map((span) => span.id)); return normalized.roots.map((root) => ({ ...root, children: root.children.filter((child) => visible.has(child.id) || flatten([child]).some((descendant) => visible.has(descendant.id))) })).filter((root) => visible.has(root.id) || root.children.length > 0); }, [all, filter, normalized.roots, search]);
+  const roots = useMemo(() => {
+    const matches = (span: TraceSpan) =>
+      (filter === 'all' || (filter === 'errors' ? span.status === 'error' : span.kind === filter)) &&
+      (!search || `${span.name} ${span.id} ${JSON.stringify(span.attributes)}`.toLowerCase().includes(search.toLowerCase()));
+    const visible = new Set(all.filter(matches).map((span) => span.id));
+    return normalized.roots
+      .map((root) => ({
+        ...root,
+        children: root.children.filter(
+          (child) => visible.has(child.id) || flatten([child]).some((descendant) => visible.has(descendant.id))
+        ),
+      }))
+      .filter((root) => visible.has(root.id) || root.children.length > 0);
+  }, [all, filter, normalized.roots, search]);
+
   const selected = all.find((span) => span.id === selectedId) || null;
-  const stats: Array<[string, string]> = [['Status', isStreaming ? 'Running' : normalized.summary.status === 'error' ? 'Error' : normalized.spans.length ? 'Complete' : 'No trace'], ['Duration', duration(normalized.summary.durationMs)], ['Spans', String(normalized.summary.spanCount)], ['Agents', String(normalized.summary.agentCount)], ['Generations', String(normalized.summary.generationCount)], ['Tools', String(normalized.summary.toolCount)], ['Input tokens', number(normalized.summary.inputTokens)], ['Output tokens', number(normalized.summary.outputTokens)]];
-  return <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0c0d10] text-white shadow-2xl shadow-black/20"><div className="shrink-0 border-b border-white/10 bg-[#111318] px-5 py-4"><div className="flex flex-wrap items-start justify-between gap-4"><div className="min-w-0"><div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-300"><Layers3 className="h-3.5 w-3.5" /> Execution trace</div><h2 className="truncate text-lg font-semibold tracking-tight">Repository inspection activity</h2><p className="mt-1 truncate text-xs text-white/45">{candidateName} · {roleTitle}{repoUrl ? ` · ${repoUrl}` : ''}</p></div><div className="flex items-center gap-2">{session.reportMarkdown && onOpenReport && <button type="button" onClick={onOpenReport} className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-[11px] font-medium text-white/70 transition hover:border-white/25 hover:bg-white/5 hover:text-white"><FileText className="h-3.5 w-3.5" /> Open report</button>}{onRunEvaluation && <button type="button" onClick={() => onRunEvaluation()} disabled={isStreaming} className="inline-flex items-center gap-2 rounded-md bg-sky-300 px-3 py-2 text-[11px] font-semibold text-[#071018] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">{isStreaming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Server className="h-3.5 w-3.5" />}{isStreaming ? 'Running' : 'Run inspection'}</button>}</div></div><div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 sm:grid-cols-4 lg:grid-cols-8">{stats.map(([label, value]) => <div key={label} className="bg-[#111318] px-3 py-2.5"><div className="text-[9px] uppercase tracking-wider text-white/35">{label}</div><div className="mt-1 truncate font-mono text-[11px] text-white/80">{value}</div></div>)}</div></div><div className="flex min-h-0 flex-1 flex-col xl:flex-row"><main className="flex min-h-0 min-w-0 flex-1 flex-col"><div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3"><div className="relative min-w-[190px] flex-1 sm:max-w-xs"><Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-white/30" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search spans or attributes" className="w-full rounded-md border border-white/10 bg-white/[0.03] py-1.5 pl-8 pr-3 text-[11px] text-white outline-none transition placeholder:text-white/25 focus:border-sky-300/60" /></div>{(['all', 'agent', 'generation', 'tool', 'errors'] as Filter[]).map((item) => <button key={item} type="button" onClick={() => setFilter(item)} className={`rounded-md px-2.5 py-1.5 text-[10px] font-medium capitalize transition ${filter === item ? 'bg-white/10 text-white' : 'text-white/40 hover:bg-white/5 hover:text-white/80'}`}>{item === 'all' ? 'All spans' : item}</button>)}</div><div className="min-h-0 flex-1 overflow-y-auto">{traceLoading || isStreaming ? <div className="flex h-full min-h-48 items-center justify-center gap-3 text-xs text-white/40"><Loader2 className="h-4 w-4 animate-spin text-sky-300" /> {isStreaming ? 'Waiting for the managed trace to become available…' : 'Loading recorded trace…'}</div> : error ? <div className="m-5 rounded-lg border border-red-300/20 bg-red-300/[0.05] p-4 text-xs text-red-100"><div className="flex items-center gap-2 font-medium"><AlertCircle className="h-4 w-4" /> Trace unavailable</div><p className="mt-2 text-red-100/60">{error}</p>{(onRetry || onRunEvaluation) && <button type="button" onClick={() => (onRetry ? onRetry() : onRunEvaluation?.())} className="mt-3 rounded-md border border-red-200/20 px-3 py-1.5 text-[11px] text-red-100 transition hover:bg-red-200/10">Retry</button>}</div> : roots.length ? <div className="p-3">{roots.map((span) => <SpanRow key={span.id} span={span} selected={selectedId === span.id} selectedId={selectedId} onSelect={() => setSelectedId(span.id)} />)}</div> : <div className="flex h-full min-h-48 flex-col items-center justify-center px-8 text-center"><Command className="h-7 w-7 text-white/20" /><p className="mt-3 text-sm text-white/60">No recorded spans yet</p><p className="mt-1 max-w-sm text-xs leading-5 text-white/35">The trace appears after the managed Agents API turn finishes. Large inputs, outputs, and tool results stay hidden until you inspect a span.</p></div>}</div></main>{selected && <DetailPanel span={selected} onClose={() => setSelectedId(null)} />}</div><div className="flex shrink-0 items-center justify-between border-t border-white/10 bg-[#111318] px-5 py-2.5 text-[10px] text-white/35"><span className="flex items-center gap-2"><Clock3 className="h-3 w-3" /> Recorded OTLP spans · session {normalized.summary.sessionId || session.sessionId}</span><span className="hidden sm:inline">Select a span to inspect its recorded payload</span></div></div>;
+
+  const stats: Array<[string, string]> = [
+    ['Status', isStreaming ? 'Running' : normalized.summary.status === 'error' ? 'Error' : normalized.spans.length ? 'Complete' : 'No trace'],
+    ['Duration', duration(normalized.summary.durationMs)],
+    ['Spans', String(normalized.summary.spanCount)],
+    ['Agents', String(normalized.summary.agentCount)],
+    ['Generations', String(normalized.summary.generationCount)],
+    ['Tools', String(normalized.summary.toolCount)],
+    ['Input tokens', number(normalized.summary.inputTokens)],
+    ['Output tokens', number(normalized.summary.outputTokens)],
+  ];
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-sharp border border-white/15 bg-black text-white shadow-2xl shadow-black/40">
+      <div className="shrink-0 border-b border-white/15 bg-white/[0.02] px-5 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+              <Layers3 className="h-3.5 w-3.5" /> Execution trace
+            </div>
+            <h2 className="truncate text-lg font-semibold tracking-tight">Repository inspection activity</h2>
+            <p className="mt-1 truncate text-xs text-white/45">
+              {candidateName} · {roleTitle}
+              {repoUrl ? ` · ${repoUrl}` : ''}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {session.reportMarkdown && onOpenReport && (
+              <button
+                type="button"
+                onClick={onOpenReport}
+                className="inline-flex items-center gap-2 rounded-sharp border border-white/20 px-3 py-2 text-[11px] font-medium text-white/70 transition hover:border-white hover:bg-white/5 hover:text-white"
+              >
+                <FileText className="h-3.5 w-3.5" /> Open report
+              </button>
+            )}
+
+            {onRunEvaluation && (
+              <button
+                type="button"
+                onClick={() => onRunEvaluation()}
+                disabled={isStreaming}
+                className="inline-flex items-center gap-2 rounded-sharp bg-primary px-3 py-2 text-[11px] font-semibold text-black transition hover:bg-white hover:text-black shadow-[1px_1px_0px_0px_rgba(255,255,255,1)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isStreaming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Server className="h-3.5 w-3.5" />}
+                {isStreaming ? 'Running' : 'Run inspection'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-sharp border border-white/15 bg-white/10 sm:grid-cols-4 lg:grid-cols-8">
+          {stats.map(([label, value]) => (
+            <div key={label} className="bg-[#0a0a0c] px-3 py-2.5">
+              <div className="text-[9px] uppercase tracking-wider text-white/35">{label}</div>
+              <div className="mt-1 truncate font-mono text-[11px] text-white/80">{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex flex-wrap items-center gap-2 border-b border-white/15 px-4 py-3">
+            <div className="relative min-w-[190px] flex-1 sm:max-w-xs">
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-white/30" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search spans or attributes"
+                className="w-full rounded-sharp border border-white/15 bg-white/[0.03] py-1.5 pl-8 pr-3 text-[11px] text-white outline-none transition placeholder:text-white/25 focus:border-primary/70"
+              />
+            </div>
+
+            {(['all', 'agent', 'generation', 'tool', 'errors'] as Filter[]).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setFilter(item)}
+                className={`rounded-sharp px-2.5 py-1.5 text-[10px] font-medium capitalize transition ${
+                  filter === item
+                    ? 'bg-white/15 text-white border border-white/20'
+                    : 'border border-transparent text-white/40 hover:bg-white/5 hover:text-white/80'
+                }`}
+              >
+                {item === 'all' ? 'All spans' : item}
+              </button>
+            ))}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {traceLoading || isStreaming ? (
+              <div className="flex h-full min-h-48 items-center justify-center gap-3 text-xs text-white/40">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />{' '}
+                {isStreaming ? 'Waiting for the managed trace to become available…' : 'Loading recorded trace…'}
+              </div>
+            ) : error ? (
+              <div className="m-5 rounded-sharp border border-red-500/20 bg-red-500/[0.05] p-4 text-xs text-red-100">
+                <div className="flex items-center gap-2 font-medium">
+                  <AlertCircle className="h-4 w-4" /> Trace unavailable
+                </div>
+                <p className="mt-2 text-red-100/60">{error}</p>
+                {(onRetry || onRunEvaluation) && (
+                  <button
+                    type="button"
+                    onClick={() => (onRetry ? onRetry() : onRunEvaluation?.())}
+                    className="mt-3 rounded-sharp border border-red-200/20 px-3 py-1.5 text-[11px] text-red-100 transition hover:bg-red-200/10"
+                  >
+                    Retry
+                  </button>
+                )}
+              </div>
+            ) : roots.length ? (
+              <div className="p-3">
+                {roots.map((span) => (
+                  <SpanRow
+                    key={span.id}
+                    span={span}
+                    selected={selectedId === span.id}
+                    selectedId={selectedId}
+                    onSelect={() => setSelectedId(span.id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex h-full min-h-48 flex-col items-center justify-center px-8 text-center">
+                <Command className="h-7 w-7 text-white/20" />
+                <p className="mt-3 text-sm text-white/60">No recorded spans yet</p>
+                <p className="mt-1 max-w-sm text-xs leading-5 text-white/35">
+                  The trace appears after the managed Agents API turn finishes. Large inputs, outputs, and tool results stay
+                  hidden until you inspect a span.
+                </p>
+              </div>
+            )}
+          </div>
+        </main>
+
+        {selected && <DetailPanel span={selected} onClose={() => setSelectedId(null)} />}
+      </div>
+
+      <div className="flex shrink-0 items-center justify-between border-t border-white/15 bg-white/[0.02] px-5 py-2.5 text-[10px] text-white/35">
+        <span className="flex items-center gap-2">
+          <Clock3 className="h-3 w-3" /> Recorded OTLP spans · session {normalized.summary.sessionId || session.sessionId}
+        </span>
+        <span className="hidden sm:inline">Select a span to inspect its recorded payload</span>
+      </div>
+    </div>
+  );
 }

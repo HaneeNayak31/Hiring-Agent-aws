@@ -38,8 +38,8 @@ export default function MCPInfrastructureSection() {
                   <Terminal className="w-4 h-4 text-primary" />
                   <span>{tool.name}</span>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-                  {tool.callsToday} CALLS TODAY
+                <span className="text-[10px] px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold uppercase tracking-wider">
+                  ● {tool.category} ({tool.operation})
                 </span>
               </div>
 

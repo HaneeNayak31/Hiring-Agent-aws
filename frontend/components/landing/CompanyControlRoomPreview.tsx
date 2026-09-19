@@ -92,16 +92,16 @@ export default function CompanyControlRoomPreview() {
 
             <div className="flex flex-wrap gap-3 text-xs">
               <Link
-                href="/company/candidates/cand-1"
-                className="px-4 py-2 bg-primary text-black font-bold uppercase hover:bg-primary/90 transition"
+                href="/company/candidates"
+                className="px-4 py-2 bg-primary text-black font-bold uppercase hover:bg-primary/90 transition shadow-[2px_2px_0px_0px_rgba(255,255,255,1)]"
               >
-                Inspect Evidence Graph
+                Inspect Talent Registry →
               </Link>
               <Link
-                href="/company/candidates/cand-1/brief"
+                href="/company/reports"
                 className="px-4 py-2 border border-white/30 text-white font-bold uppercase hover:border-white transition"
               >
-                Open Interview Briefing
+                Open Candidate Dossiers →
               </Link>
             </div>
           </div>

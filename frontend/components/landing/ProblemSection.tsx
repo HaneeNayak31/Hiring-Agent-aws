@@ -13,11 +13,11 @@ const todaySteps = [
 ];
 
 const futureSteps = [
-  { text: 'Candidate', detail: 'Delegates criteria & preferences' },
-  { text: 'Personal AI Agent', detail: 'Runs 24/7 autonomous discovery' },
-  { text: 'Company Hiring MCP', detail: 'Direct server-to-server query' },
-  { text: 'Verification Agent', detail: 'Evidence graph & skill validation' },
-  { text: 'Interviewer Briefing', detail: 'Structured evidence-backed packet' },
+  { text: 'Code Repository & Passport', detail: 'Candidates apply directly or delegate to AI agents via MCP' },
+  { text: 'Standardized Hiring Protocol', detail: 'Company requisitions exposed with explicit technical rubrics' },
+  { text: 'Multi-Agent Code Forensics', detail: 'AWS Lambda runs git timeline, commit integrity & SOLID audits' },
+  { text: 'OpenTelemetry Flight Recorder', detail: 'Real-time OTLP span trees capture execution & token metrics' },
+  { text: 'Recruiter Intelligence Dossier', detail: 'Automated evidence graph with targeted interview probe questions' },
 ];
 
 export default function ProblemSection() {

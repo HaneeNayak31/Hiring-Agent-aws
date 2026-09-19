@@ -501,6 +501,17 @@ class HiringDatabase:
         table = dynamodb.Table(APPS_TABLE_NAME)
         table.put_item(Item=_float_to_decimal(record))
 
+        # Atomically increment application counts on the jobs table
+        try:
+            jobs_table = dynamodb.Table(JOBS_TABLE_NAME)
+            jobs_table.update_item(
+                Key={"job_id": submission.job_id},
+                UpdateExpression="ADD applications_count :inc, in_verification_count :inc",
+                ExpressionAttributeValues={":inc": Decimal(1)}
+            )
+        except Exception as exc:
+            print(f"[MCP] Warning: Could not increment jobs table counters: {exc}", flush=True)
+
         return ApplicationReceipt(
             application_id=app_id,
             job_id=submission.job_id,

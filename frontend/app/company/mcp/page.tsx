@@ -152,8 +152,11 @@ export default function InfrastructureMCPPage() {
                       : 'border-white/20 bg-white/[0.02] text-white hover:border-white/50'
                   }`}
                 >
-                  <div className="text-xs uppercase mb-1 font-mono">{tool.name}</div>
-                  <div className="text-[10px] opacity-70">{tool.callsToday} calls</div>
+                  <div className="text-xs uppercase mb-1.5 font-mono font-bold tracking-tight">{tool.name}</div>
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span className="opacity-80 font-mono tracking-wider">{tool.category}</span>
+                  </div>
                 </button>
               );
             })}

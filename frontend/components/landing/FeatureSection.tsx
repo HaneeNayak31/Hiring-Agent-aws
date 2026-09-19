@@ -7,33 +7,33 @@ import Link from 'next/link';
 const features = [
   {
     num: '01',
-    title: 'EVIDENCE GRAPH',
+    title: 'MULTI-AGENT CODE FORENSICS',
     icon: Network,
-    subtitle: 'No self-reported claims. Only verified proof.',
+    subtitle: 'No self-reported claims. Only authentic repo proof.',
     description:
-      'Skills are automatically validated against real code repositories, live production architecture, and verified project output. Recruiters inspect root evidence in seconds.',
-    href: '/company/candidates/cand-1',
-    actionText: 'View Candidate Workspace',
+      'Skills and commit habits are automatically validated against candidate GitHub repositories. Specialized agents inspect commit frequencies, author history, and SOLID architecture principles.',
+    href: '/company/candidates',
+    actionText: 'Explore Talent Registry',
   },
   {
     num: '02',
-    title: 'AGENCY TIMELINE',
+    title: 'OPENTELEMETRY FLIGHT RECORDER',
     icon: Terminal,
-    subtitle: 'Real-time operational event stream.',
+    subtitle: 'Real-time multi-agent execution telemetry.',
     description:
-      'Watch your agent query hiring MCPs, evaluate requirement overlap, negotiate timeline parameters, and submit applications with full candidate delegation logging.',
-    href: '/candidate/activity',
-    actionText: 'Inspect Live Activity',
+      'Inspect millisecond-level execution traces. In-memory SSE streaming synthesizes complete OTLP JSON hierarchies with zero eventual consistency delay, capturing every subagent tool call and token metric.',
+    href: '/company/mcp',
+    actionText: 'Inspect Protocol Traces',
   },
   {
     num: '03',
-    title: 'INTERVIEW BRIEFING',
+    title: 'INTERVIEW INTELLIGENCE DOSSIER',
     icon: FileText,
-    subtitle: 'Zero fluff packets for engineering leads.',
+    subtitle: 'Zero-fluff briefing packets for engineering leads.',
     description:
-      'Recruiters and hiring managers receive pre-compiled technical briefing packets highlighting confirmed competencies, potential gap areas, and targeted probe questions.',
-    href: '/company/candidates/cand-1/brief',
-    actionText: 'Open Sample Briefing',
+      'Recruiters and hiring managers receive pre-compiled technical dossiers highlighting confirmed engineering competencies, verified repository proofs, and targeted technical interview questions.',
+    href: '/company/reports',
+    actionText: 'Review Intelligence Reports',
   },
 ];
 

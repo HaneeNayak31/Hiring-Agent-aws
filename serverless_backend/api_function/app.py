@@ -131,16 +131,6 @@ def _resolve_artifact_identifier(identifier: str) -> str:
 
 
 # ----------------------------------------------------
-# In-Memory Fallback Seed (Ensures immediate offline operation)
-# ----------------------------------------------------
-
-INITIAL_FALLBACK_JOBS: Dict[str, Dict[str, Any]] = {}
-
-IN_MEMORY_JOBS: Dict[str, Dict[str, Any]] = {}
-IN_MEMORY_APPLICATIONS: Dict[str, Dict[str, Any]] = {}
-
-
-# ----------------------------------------------------
 # 1. Health Endpoint
 # ----------------------------------------------------
 
@@ -168,37 +158,64 @@ def health():
 def list_jobs(status: Optional[str] = Query(None, description="Filter by status: active, paused, closed, all")):
     """
     Lists all job requisitions from DynamoDB 'HiringAgent_Jobs'.
+    Enriches each job with real-time application counts dynamically aggregated from 'HiringAgent_Applications'.
     """
     jobs: List[Dict[str, Any]] = []
 
     try:
         dynamodb = _get_dynamodb_resource()
-        table = dynamodb.Table(JOBS_TABLE_NAME)
+        jobs_table = dynamodb.Table(JOBS_TABLE_NAME)
 
-        if status and status.lower() != "all":
+        status_val = status if isinstance(status, str) else None
+        if status_val and status_val.lower() != "all":
             # Query GSI status-posted_at-index
-            response = table.query(
+            response = jobs_table.query(
                 IndexName="status-posted_at-index",
-                KeyConditionExpression=boto3.dynamodb.conditions.Key("status").eq(status.lower())
+                KeyConditionExpression=boto3.dynamodb.conditions.Key("status").eq(status_val.lower())
             )
             items = response.get("Items", [])
         else:
-            response = table.scan()
+            response = jobs_table.scan()
             items = response.get("Items", [])
 
         if items:
             jobs = [_decimal_to_native(item) for item in items]
+
+        # Dynamically aggregate live applicant counts from HiringAgent_Applications
+        try:
+            apps_table = dynamodb.Table(APPS_TABLE_NAME)
+            apps_res = apps_table.scan(
+                ProjectionExpression="job_id, #st",
+                ExpressionAttributeNames={"#st": "status"}
+            )
+            app_items = apps_res.get("Items", [])
+
+            counts_map: Dict[str, Dict[str, int]] = {}
+            for app in app_items:
+                j_id = app.get("job_id")
+                if not j_id:
+                    continue
+                if j_id not in counts_map:
+                    counts_map[j_id] = {"total": 0, "verifying": 0, "interview_ready": 0}
+                counts_map[j_id]["total"] += 1
+                st = app.get("status", "")
+                if st in ("SUBMITTED_PENDING_SANDBOX", "EVALUATING"):
+                    counts_map[j_id]["verifying"] += 1
+                elif st == "EVALUATED":
+                    counts_map[j_id]["interview_ready"] += 1
+
+            for job in jobs:
+                jid = job.get("job_id") or job.get("id")
+                if jid and jid in counts_map:
+                    c = counts_map[jid]
+                    job["applications_count"] = max(job.get("applications_count", 0), c["total"])
+                    job["in_verification_count"] = max(job.get("in_verification_count", 0), c["verifying"])
+                    job["interview_ready_count"] = max(job.get("interview_ready_count", 0), c["interview_ready"])
+        except Exception as agg_err:
+            print(f"[API] Live application count aggregation warning: {agg_err}", flush=True)
+
     except Exception as e:
         print(f"[API] DynamoDB scan/query failed ({e}).", flush=True)
-
-    # Combine with any in-memory jobs if saved locally
-    for j_id, j_obj in IN_MEMORY_JOBS.items():
-        if not any(j.get("job_id") == j_id or j.get("id") == j_id for j in jobs):
-            jobs.append(j_obj)
-
-    # Filter in-memory if needed
-    if status and status.lower() != "all":
-        jobs = [j for j in jobs if j.get("status", "").lower() == status.lower()]
 
     return {"jobs": jobs, "total": len(jobs)}
 
@@ -218,7 +235,6 @@ def create_job(job_data: Dict[str, Any] = Body(...)):
     slug = title.lower().replace(" ", "-").replace("/", "-")
     raw_id = job_data.get("id") or job_data.get("job_id") or f"job-{slug[:18]}-{uuid.uuid4().hex[:4]}"
 
-    # Normalize role structure matching JobDetail
     job_record: Dict[str, Any] = {
         "job_id": raw_id,
         "id": raw_id,
@@ -261,30 +277,25 @@ def create_job(job_data: Dict[str, Any] = Body(...)):
         "interview_ready_count": 0
     }
 
-    # Save to DynamoDB
-    saved_to_dynamo = False
     try:
         dynamodb = _get_dynamodb_resource()
         table = dynamodb.Table(JOBS_TABLE_NAME)
         table.put_item(Item=_float_to_decimal(job_record))
-        saved_to_dynamo = True
     except Exception as e:
-        print(f"[API] DynamoDB put_item failed ({e}). Storing in memory.", flush=True)
-
-    # Always keep in-memory fallback updated
-    IN_MEMORY_JOBS[raw_id] = job_record
+        print(f"[API] DynamoDB put_item failed: {e}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Failed to persist job requisition: {e}")
 
     return {
         "status": "CREATED",
         "job": job_record,
-        "persisted_in_dynamodb": saved_to_dynamo
+        "persisted_in_dynamodb": True
     }
 
 
 @app.get("/api/jobs/{job_id}")
 def get_job(job_id: str):
     """
-    Fetches full specification of a single job requisition.
+    Fetches full specification of a single job requisition from DynamoDB.
     """
     try:
         dynamodb = _get_dynamodb_resource()
@@ -292,12 +303,29 @@ def get_job(job_id: str):
         response = table.get_item(Key={"job_id": job_id})
         item = response.get("Item")
         if item:
-            return _decimal_to_native(item)
-    except Exception:
-        pass
-
-    if job_id in IN_MEMORY_JOBS:
-        return IN_MEMORY_JOBS[job_id]
+            job = _decimal_to_native(item)
+            # Fetch real-time applications count
+            try:
+                apps_table = dynamodb.Table(APPS_TABLE_NAME)
+                apps_res = apps_table.scan(
+                    FilterExpression=boto3.dynamodb.conditions.Attr("job_id").eq(job_id),
+                    ProjectionExpression="#st",
+                    ExpressionAttributeNames={"#st": "status"}
+                )
+                matching = apps_res.get("Items", [])
+                if matching:
+                    job["applications_count"] = max(job.get("applications_count", 0), len(matching))
+                    job["in_verification_count"] = sum(
+                        1 for m in matching if m.get("status") in ("SUBMITTED_PENDING_SANDBOX", "EVALUATING")
+                    )
+                    job["interview_ready_count"] = sum(
+                        1 for m in matching if m.get("status") == "EVALUATED"
+                    )
+            except Exception:
+                pass
+            return job
+    except Exception as exc:
+        print(f"[API] get_job error: {exc}", flush=True)
 
     raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
 
@@ -309,7 +337,6 @@ def update_job_status(job_id: str, payload: Dict[str, Any] = Body(...)):
     Automatically toggles MCP exposure.
     """
     new_status = payload.get("status", "").lower()
-    # Accept "open" as frontend alias for "active"
     if new_status == "open":
         new_status = "active"
     if new_status not in ["active", "paused", "closed", "archived"]:
@@ -326,13 +353,9 @@ def update_job_status(job_id: str, payload: Dict[str, Any] = Body(...)):
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={":status": new_status, ":mcp": mcp_exposed}
         )
-    except Exception:
-        pass
-
-    if job_id in IN_MEMORY_JOBS:
-        IN_MEMORY_JOBS[job_id]["status"] = new_status
-        IN_MEMORY_JOBS[job_id]["mcp_exposed"] = mcp_exposed
-        return IN_MEMORY_JOBS[job_id]
+    except Exception as exc:
+        print(f"[API] update_job_status error: {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Failed to update job status: {exc}")
 
     return {"job_id": job_id, "status": new_status, "mcp_exposed": mcp_exposed}
 
@@ -356,12 +379,7 @@ def list_all_applications():
         if items:
             apps = [_decimal_to_native(item) for item in items]
     except Exception as e:
-        print(f"[API] Applications scan failed ({e}). Using memory.", flush=True)
-
-    # Combine with in-memory store
-    for app_id, app_obj in IN_MEMORY_APPLICATIONS.items():
-        if not any(a.get("application_id") == app_id for a in apps):
-            apps.append(app_obj)
+        print(f"[API] Applications scan failed ({e}).", flush=True)
 
     return {"applications": apps, "total": len(apps)}
 
@@ -369,25 +387,26 @@ def list_all_applications():
 @app.get("/api/jobs/{job_id}/applications")
 def list_job_applications(job_id: str):
     """
-    Fetches all candidate applications for a specific job requisition.
+    Fetches all candidate applications for a specific job requisition from DynamoDB.
     """
     apps: List[Dict[str, Any]] = []
     try:
         dynamodb = _get_dynamodb_resource()
         table = dynamodb.Table(APPS_TABLE_NAME)
-        response = table.query(
-            IndexName="job_id-submitted_at-index",
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("job_id").eq(job_id)
-        )
-        apps = [_decimal_to_native(item) for item in response.get("Items", [])]
+        try:
+            response = table.query(
+                IndexName="job_id-submitted_at-index",
+                KeyConditionExpression=boto3.dynamodb.conditions.Key("job_id").eq(job_id)
+            )
+            apps = [_decimal_to_native(item) for item in response.get("Items", [])]
+        except Exception as query_err:
+            print(f"[API] GSI query on applications failed ({query_err}). Using scan fallback.", flush=True)
+            response = table.scan(
+                FilterExpression=boto3.dynamodb.conditions.Attr("job_id").eq(job_id)
+            )
+            apps = [_decimal_to_native(item) for item in response.get("Items", [])]
     except Exception as e:
-        print(f"[API] Job applications query failed ({e}).", flush=True)
-
-    # Check in-memory
-    mem_apps = [a for a in IN_MEMORY_APPLICATIONS.values() if a.get("job_id") == job_id]
-    for ma in mem_apps:
-        if not any(a.get("application_id") == ma.get("application_id") for a in apps):
-            apps.append(ma)
+        print(f"[API] Job applications retrieval failed ({e}).", flush=True)
 
     return {"applications": apps, "job_id": job_id, "total": len(apps)}
 
@@ -404,11 +423,8 @@ def get_application(application_id: str):
         item = response.get("Item")
         if item:
             return _decimal_to_native(item)
-    except Exception:
-        pass
-
-    if application_id in IN_MEMORY_APPLICATIONS:
-        return IN_MEMORY_APPLICATIONS[application_id]
+    except Exception as exc:
+        print(f"[API] get_application error: {exc}", flush=True)
 
     raise HTTPException(status_code=404, detail="Application not found")
 
@@ -418,6 +434,7 @@ def create_application(payload: Dict[str, Any] = Body(...)):
     """
     Creates a new candidate application from the web UI.
     Persists to DynamoDB HiringAgent_Applications (triggers evaluator Lambda via stream).
+    Atomically increments application counts on HiringAgent_Jobs.
     """
     job_id = payload.get("job_id", "").strip()
     candidate_passport = payload.get("candidate_passport", {})
@@ -432,7 +449,7 @@ def create_application(payload: Dict[str, Any] = Body(...)):
     if confirmed is not True:
         raise HTTPException(status_code=400, detail="Explicit candidate confirmation is required before submission.")
 
-    # Keep REST submissions aligned with the MCP submission contract.
+    # Validate against job requirements
     try:
         job = get_job(job_id)
     except HTTPException:
@@ -472,11 +489,7 @@ def create_application(payload: Dict[str, Any] = Body(...)):
 
     app_id = f"app-{uuid.uuid4().hex[:8]}"
     now_iso = datetime.now(timezone.utc).isoformat()
-
-    # Resolve job title
-    job_title = job_id
-    if job_id in IN_MEMORY_JOBS:
-        job_title = IN_MEMORY_JOBS[job_id].get("title", job_id)
+    job_title = job.get("title") or job_id
 
     record = {
         "application_id": app_id,
@@ -494,16 +507,24 @@ def create_application(payload: Dict[str, Any] = Body(...)):
         }
     }
 
-    saved_to_dynamo = False
     try:
         dynamodb = _get_dynamodb_resource()
-        table = dynamodb.Table(APPS_TABLE_NAME)
-        table.put_item(Item=_float_to_decimal(record))
-        saved_to_dynamo = True
+        apps_table = dynamodb.Table(APPS_TABLE_NAME)
+        apps_table.put_item(Item=_float_to_decimal(record))
     except Exception as e:
-        print(f"[API] DynamoDB put_item for application failed ({e}). Storing in memory.", flush=True)
+        print(f"[API] DynamoDB put_item for application failed: {e}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Failed to persist application in DynamoDB: {e}")
 
-    IN_MEMORY_APPLICATIONS[app_id] = record
+    # Atomically increment jobs table counters
+    try:
+        jobs_table = dynamodb.Table(JOBS_TABLE_NAME)
+        jobs_table.update_item(
+            Key={"job_id": job_id},
+            UpdateExpression="ADD applications_count :inc, in_verification_count :inc",
+            ExpressionAttributeValues={":inc": Decimal(1)}
+        )
+    except Exception as exc:
+        print(f"[API] Warning: Could not increment job counters: {exc}", flush=True)
 
     return {
         "status": "SUBMITTED",
@@ -511,7 +532,7 @@ def create_application(payload: Dict[str, Any] = Body(...)):
         "job_id": job_id,
         "candidate_name": full_name,
         "submitted_at": now_iso,
-        "persisted_in_dynamodb": saved_to_dynamo
+        "persisted_in_dynamodb": True
     }
 
 

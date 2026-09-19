@@ -14,46 +14,46 @@ export default function CandidateNeverComesSection() {
       <div className="max-w-6xl mx-auto">
         <div className="mb-16">
           <span className="font-mono text-xs tracking-widest text-primary uppercase block mb-3 font-bold">
-            // Fundamental Differentiator
+            // Dual-Path Agentic Architecture
           </span>
           <h2 className="font-bold text-4xl md:text-7xl tracking-tighter uppercase leading-[0.95] mb-6">
-            THE CANDIDATE
+            DIRECT WEB OR
             <br />
-            <span className="text-primary">NEVER COMES HERE.</span>
+            <span className="text-primary">AGENT-DELEGATED.</span>
           </h2>
           <p className="text-black/70 text-lg md:text-xl font-sans max-w-2xl leading-relaxed">
-            Candidates do not create another account, learn another portal, or fill out repetitive application forms. Their existing AI assistant does the work.
+            Candidates can apply with their GitHub repository in seconds, or delegate job discovery and application entirely to their external AI assistants (ChatGPT, Claude, Gemini) via standardized Model Context Protocol (MCP) endpoints.
           </p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6 mb-16 font-mono text-xs">
           <div className="border border-black/20 p-6 bg-offWhite/40">
-            <div className="flex items-center gap-2 text-red-600 font-bold mb-2">
-              <XCircle className="w-4 h-4" />
-              <span>NO JOB BOARDS</span>
+            <div className="flex items-center gap-2 text-primary font-bold mb-2">
+              <CheckCircle2 className="w-4 h-4 text-primary" />
+              <span>ZERO BLACK-HOLE ATS</span>
             </div>
             <p className="text-black/70 font-sans leading-normal">
-              Candidates don&apos;t scroll through endless listings or manually filter tags.
+              Every submission triggers live multi-agent sandbox evaluation with real-time status and flight recorder telemetry.
             </p>
           </div>
 
           <div className="border border-black/20 p-6 bg-offWhite/40">
-            <div className="flex items-center gap-2 text-red-600 font-bold mb-2">
-              <XCircle className="w-4 h-4" />
-              <span>NO APPLICATION FORMS</span>
+            <div className="flex items-center gap-2 text-emerald-600 font-bold mb-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>AUTHENTIC CODE EVIDENCE</span>
             </div>
             <p className="text-black/70 font-sans leading-normal">
-              Zero 50-field work history forms or uploaded PDF parsers that break.
+              No tailored resume buzzwords. Real commits, branch histories, and repository architecture prove engineering depth.
             </p>
           </div>
 
           <div className="border border-black/20 p-6 bg-offWhite/40">
-            <div className="flex items-center gap-2 text-red-600 font-bold mb-2">
-              <XCircle className="w-4 h-4" />
-              <span>NO DASHBOARD LOGINS</span>
+            <div className="flex items-center gap-2 text-primary font-bold mb-2">
+              <CheckCircle2 className="w-4 h-4 text-primary" />
+              <span>AGENT MCP BRIDGE</span>
             </div>
             <p className="text-black/70 font-sans leading-normal">
-              No candidate-facing candidate accounts or passwords to manage.
+              Candidates can connect ChatGPT or Claude to discover open roles and apply autonomously on their behalf.
             </p>
           </div>
         </div>

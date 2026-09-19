@@ -24,7 +24,25 @@ export default function CompanyDashboard() {
         fetchApplications()
       ]);
       if (liveJobs) {
-        setRolesList(liveJobs.map(mapJobDetailToOpenRole));
+        const apps = liveApps || [];
+        const mapped = liveJobs.map((j) => {
+          const role = mapJobDetailToOpenRole(j);
+          const matchingApps = apps.filter((a) => a.job_id === role.id || a.job_id === j.job_id);
+          const totalCount = Math.max(role.applicationsCount || 0, matchingApps.length);
+          const verifyingCount = matchingApps.filter(
+            (a) => a.status === 'SUBMITTED_PENDING_SANDBOX' || a.status === 'EVALUATING'
+          ).length;
+          const readyCount = matchingApps.filter((a) => a.status === 'EVALUATED').length;
+
+          return {
+            ...role,
+            applicationsCount: totalCount,
+            agentApplicationsCount: totalCount,
+            inVerificationCount: Math.max(role.inVerificationCount || 0, verifyingCount),
+            interviewReadyCount: Math.max(role.interviewReadyCount || 0, readyCount),
+          };
+        });
+        setRolesList(mapped);
       }
       if (liveApps) {
         setApplications(liveApps);

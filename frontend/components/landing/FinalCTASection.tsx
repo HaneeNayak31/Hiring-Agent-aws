@@ -27,13 +27,19 @@ export default function FinalCTASection() {
             href="/company"
             className="px-8 py-4 bg-primary text-black font-mono uppercase tracking-wider hover:bg-primary/90 transition shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2"
           >
-            CONNECT YOUR HIRING SYSTEM →
+            COMPANY CONTROL ROOM →
+          </Link>
+          <Link
+            href="/candidate/opportunities"
+            className="px-8 py-4 bg-black text-white font-mono uppercase tracking-wider hover:bg-black/80 transition shadow-[4px_4px_0px_0px_rgba(255,106,0,1)] flex items-center gap-2"
+          >
+            APPLY TO OPEN ROLES →
           </Link>
           <Link
             href="/company/mcp"
             className="px-8 py-4 border-2 border-black bg-white text-black font-mono uppercase tracking-wider hover:bg-black hover:text-white transition flex items-center gap-2"
           >
-            EXPLORE THE PROTOCOL →
+            EXPLORE MCP PROTOCOL →
           </Link>
         </div>
       </div>

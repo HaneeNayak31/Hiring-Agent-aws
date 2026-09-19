@@ -33,20 +33,29 @@ export default function RootLayout({
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8 font-mono text-xs uppercase tracking-wider text-white/70">
+          <nav className="hidden md:flex items-center gap-6 lg:gap-8 font-mono text-xs uppercase tracking-wider text-white/70">
             <Link href="/" className="hover:text-primary transition-colors">Overview</Link>
+            <Link href="/candidate/opportunities" className="hover:text-primary transition-colors flex items-center gap-1.5 text-white">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span>Opportunities</span>
+            </Link>
             <Link href="/#how-it-works" className="hover:text-primary transition-colors">How It Works</Link>
-            <Link href="/#candidate-never-comes" className="hover:text-primary transition-colors">Why Agentic?</Link>
             <Link href="/company" className="hover:text-primary transition-colors">Control Room</Link>
             <Link href="/company/mcp" className="hover:text-primary transition-colors">MCP Protocol</Link>
           </nav>
 
-          <div className="flex items-center gap-4 font-mono text-xs">
+          <div className="flex items-center gap-3 font-mono text-xs">
+            <Link
+              href="/candidate/opportunities"
+              className="hidden sm:inline-flex px-4 py-2 border border-white/30 text-white font-bold uppercase tracking-wider hover:border-primary hover:text-primary transition"
+            >
+              Apply as Candidate
+            </Link>
             <Link
               href="/company"
               className="px-5 py-2.5 bg-primary text-black font-bold uppercase tracking-wider hover:bg-primary/90 transition shadow-[3px_3px_0px_0px_rgba(255,255,255,1)]"
             >
-              Launch Control Room →
+              Company Control Room →
             </Link>
           </div>
         </header>

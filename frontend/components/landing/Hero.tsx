@@ -2,122 +2,177 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Cpu, Server, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Cpu, Server, CheckCircle2, ArrowRight, GitBranch, Activity, ShieldCheck, Terminal, Layers } from 'lucide-react';
 
 export default function Hero() {
   return (
     <section className="bg-black text-white py-24 md:py-32 overflow-hidden relative border-b border-white/15">
-      <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center px-6">
+      <div className="max-w-7xl mx-auto grid lg:grid-cols-12 gap-12 lg:gap-16 items-center px-6">
         <motion.div
-          initial={{ opacity: 0, x: -40 }}
+          className="lg:col-span-7"
+          initial={{ opacity: 0, x: -30 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.7 }}
+          transition={{ duration: 0.6 }}
         >
-          <div className="inline-flex items-center gap-2 font-mono text-xs text-primary uppercase tracking-widest px-3 py-1 bg-primary/10 border border-primary/30 mb-6 font-bold">
+          <div className="inline-flex items-center gap-2 font-mono text-xs text-primary uppercase tracking-widest px-3.5 py-1.5 bg-primary/10 border border-primary/30 mb-6 font-bold">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            Hiring Infrastructure for the Agent Era
+            <span>AUTONOMOUS MULTI-AGENT HIRING & FORENSICS PLATFORM</span>
           </div>
 
-          <h1 className="font-bold text-5xl md:text-7xl lg:text-8xl tracking-tighter uppercase mb-6 leading-[0.9]">
-            THE JOB SEARCH
+          <h1 className="font-bold text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter uppercase mb-6 leading-[0.92]">
+            AUTONOMOUS
             <br />
-            IS GETTING
+            <span className="text-primary">CODE FORENSICS</span>
             <br />
-            <span className="text-primary">AN AGENT.</span>
+            FOR HIRING.
           </h1>
 
-          <p className="text-lg md:text-xl text-white/70 mb-10 max-w-xl font-sans leading-relaxed">
-            Candidates bring their own AI agents. Companies expose hiring capabilities through standardized MCP servers. Applications arrive directly into your company&apos;s hiring infrastructure.
+          <p className="text-lg md:text-xl text-white/70 mb-10 max-w-2xl font-sans leading-relaxed">
+            Candidates apply with real code repositories or delegate to personal AI assistants via standardized MCP servers. Autonomous AI agents run deep Git forensics, commit timeline integrity audits, and SOLID architectural evaluations—streaming real-time OpenTelemetry flight recordings to recruiter control rooms.
           </p>
 
           <div className="flex flex-wrap gap-4 font-mono text-xs">
             <Link
               href="/company"
-              className="px-8 py-4 bg-primary text-black font-bold uppercase tracking-wider hover:bg-primary/90 transition shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] flex items-center gap-2"
+              className="px-7 py-4 bg-primary text-black font-bold uppercase tracking-wider hover:bg-primary/90 transition shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] flex items-center gap-2 hover:translate-y-[-2px]"
             >
               Company Control Room
               <ArrowRight className="w-4 h-4" />
             </Link>
+
+            <Link
+              href="/candidate/opportunities"
+              className="px-7 py-4 bg-white/[0.05] border-2 border-white/30 text-white font-bold uppercase tracking-wider hover:border-emerald-400 hover:text-emerald-400 transition flex items-center gap-2"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Browse Roles & Apply
+            </Link>
+
             <Link
               href="/company/mcp"
-              className="px-8 py-4 border border-white/30 text-white font-bold uppercase tracking-wider hover:border-white transition flex items-center gap-2"
+              className="px-5 py-4 border border-white/20 text-white/60 font-bold uppercase tracking-wider hover:border-white hover:text-white transition flex items-center gap-2"
             >
               <Server className="w-4 h-4 text-primary" />
-              Inspect Hiring MCP Server
+              MCP Protocol
             </Link>
+          </div>
+
+          <div className="mt-12 pt-8 border-t border-white/10 grid grid-cols-3 gap-6 font-mono text-xs text-white/50">
+            <div>
+              <div className="text-white font-bold text-lg">0ms</div>
+              <div>Trace Availability</div>
+            </div>
+            <div>
+              <div className="text-emerald-400 font-bold text-lg">Multi-Agent</div>
+              <div>Git & Code Forensics</div>
+            </div>
+            <div>
+              <div className="text-primary font-bold text-lg">OpenTelemetry</div>
+              <div>Full OTLP Traces</div>
+            </div>
           </div>
         </motion.div>
 
+        {/* Live Multi-Agent Forensics Simulator Card */}
         <motion.div
-          className="relative"
-          initial={{ opacity: 0, scale: 0.95 }}
+          className="lg:col-span-5 relative"
+          initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.7, delay: 0.2 }}
         >
-          <div className="border-2 border-white/30 bg-white/[0.02] p-8 md:p-10 font-mono relative shadow-[10px_10px_0px_0px_rgba(255,106,0,1)]">
-            <div className="flex items-center justify-between pb-6 mb-8 border-b border-white/15">
-              <span className="text-xs text-white/50 uppercase tracking-widest">// SYSTEM PROTOCOL FLOW</span>
+          <div className="border-2 border-white bg-black p-6 md:p-8 font-mono relative shadow-[10px_10px_0px_0px_rgba(255,106,0,1)]">
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/20">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-primary" />
+                <span className="text-xs text-white font-bold uppercase tracking-wider">
+                  FORENSIC SANDBOX RUNTIME
+                </span>
+              </div>
               <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/40">
-                EXTERNAL AGENT BRIDGE
+                ACTIVE PIPELINE
               </span>
             </div>
 
-            <div className="space-y-5">
-              <div className="flex items-center justify-between p-4 border border-white/20 bg-black">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-white" />
-                  <div>
-                    <div className="text-xs font-bold text-white uppercase">CANDIDATE</div>
-                    <div className="text-[10px] text-white/50 font-sans">Delegates job criteria to AI assistant</div>
+            {/* Simulated Live Agent Hierarchy */}
+            <div className="space-y-4 text-xs">
+              {/* Coordinator */}
+              <div className="p-3.5 border border-primary/50 bg-primary/10">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2 text-primary font-bold">
+                    <Cpu className="w-3.5 h-3.5" />
+                    <span>COORDINATOR: invoke_agent</span>
                   </div>
+                  <span className="text-[10px] text-white/50">gpt-5.6-luna</span>
                 </div>
-                <span className="text-[10px] text-white/40">USER AGENT</span>
+                <div className="text-[11px] text-white/80 font-sans">
+                  Orchestrating repository forensics on candidate submission...
+                </div>
               </div>
 
-              <div className="h-5 w-px bg-gradient-to-b from-white/40 to-primary ml-5" />
-
-              <div className="flex items-center justify-between p-4 border-2 border-primary bg-primary/10">
-                <div className="flex items-center gap-3">
-                  <Cpu className="w-4 h-4 text-primary animate-pulse" />
-                  <div>
-                    <div className="text-xs font-bold text-primary uppercase">PERSONAL AI AGENT</div>
-                    <div className="text-[10px] text-white/70 font-sans">ChatGPT / Claude / Gemini Agent</div>
+              {/* Subagents Branch */}
+              <div className="pl-4 border-l-2 border-white/20 space-y-3">
+                {/* Subagent 1: Git Forensics */}
+                <div className="p-3 border border-white/20 bg-white/[0.02]">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <GitBranch className="w-3.5 h-3.5" />
+                      <span>git-forensics-evaluator</span>
+                    </div>
+                    <span className="text-[10px] text-emerald-400 font-bold">PASSED</span>
+                  </div>
+                  <div className="text-[11px] text-white/60 font-sans">
+                    38 commits verified. Author divergence 0%. Authentic cadence.
                   </div>
                 </div>
-                <span className="text-xs px-2 py-0.5 bg-primary text-black font-bold">EXTERNAL</span>
+
+                {/* Subagent 2: SOLID Architecture */}
+                <div className="p-3 border border-white/20 bg-white/[0.02]">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 text-amber-400 font-bold">
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>solid-architecture-rubric</span>
+                    </div>
+                    <span className="text-[10px] text-amber-400 font-bold">94/100</span>
+                  </div>
+                  <div className="text-[11px] text-white/60 font-sans">
+                    Single-responsibility microservices. Clean interface boundaries.
+                  </div>
+                </div>
+
+                {/* Subagent 3: Flight Recorder */}
+                <div className="p-3 border border-white/20 bg-white/[0.02]">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 text-cyan-400 font-bold">
+                      <Activity className="w-3.5 h-3.5" />
+                      <span>flight-recorder-otlp</span>
+                    </div>
+                    <span className="text-[10px] text-cyan-400 font-bold">STREAMED</span>
+                  </div>
+                  <div className="text-[11px] text-white/60 font-sans">
+                    Captured 14 spans, 52k tokens, tool telemetry to S3.
+                  </div>
+                </div>
               </div>
 
-              <div className="h-5 w-px bg-gradient-to-b from-primary to-white ml-5" />
-
-              <div className="flex items-center justify-between p-4 border border-white/30 bg-white/10">
-                <div className="flex items-center gap-3">
-                  <Server className="w-4 h-4 text-white" />
-                  <div>
-                    <div className="text-xs font-bold text-white uppercase">HIRING MCP SERVER</div>
-                    <div className="text-[10px] text-white/60 font-sans">Exposes search_jobs & apply_to_job</div>
-                  </div>
+              {/* Outcome Output */}
+              <div className="p-3 border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>CANDIDATE INTELLIGENCE REPORT</span>
                 </div>
-                <span className="text-xs text-emerald-400 font-bold">mcp.company/hiring</span>
-              </div>
-
-              <div className="h-5 w-px bg-gradient-to-b from-white to-emerald-400 ml-5" />
-
-              <div className="flex items-center justify-between p-4 border border-emerald-500/40 bg-emerald-500/5">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <div>
-                    <div className="text-xs font-bold text-emerald-400 uppercase">COMPANY HIRING INFRASTRUCTURE</div>
-                    <div className="text-[10px] text-white/60 font-sans">Receives evidence & generates briefing</div>
-                  </div>
-                </div>
-                <span className="text-xs text-emerald-400 font-bold">HR DASHBOARD</span>
+                <Link
+                  href="/company/candidates"
+                  className="text-xs text-white underline hover:text-primary transition"
+                >
+                  View Dossier →
+                </Link>
               </div>
             </div>
           </div>
         </motion.div>
       </div>
 
-      <div className="absolute inset-0 pointer-events-none bg-[url('/texture/halftone.svg')] opacity-10" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] opacity-5" />
     </section>
   );
 }

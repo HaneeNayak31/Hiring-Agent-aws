@@ -3,7 +3,7 @@
 import CompanyNav from '@/components/layout/CompanyNav';
 import Breadcrumbs from '@/components/layout/Breadcrumbs';
 import { OpenRole } from '@/data/mockData';
-import { fetchJobs, updateJobStatus, ApiError } from '@/data/apiClient';
+import { fetchJobs, fetchApplications, updateJobStatus, ApiError } from '@/data/apiClient';
 import { mapJobDetailToOpenRole } from '@/data/schemaAdapter';
 import ApiErrorBanner from '@/components/layout/ApiErrorBanner';
 import { useState, useEffect, useCallback } from 'react';
@@ -27,9 +27,29 @@ export default function RolesPage() {
     setLoading(true);
     setApiError(null);
     try {
-      const liveJobs = await fetchJobs();
+      const [liveJobs, liveApps] = await Promise.all([
+        fetchJobs(),
+        fetchApplications().catch(() => [])
+      ]);
       if (liveJobs) {
-        const mapped = liveJobs.map(mapJobDetailToOpenRole);
+        const apps = liveApps || [];
+        const mapped = liveJobs.map((j) => {
+          const role = mapJobDetailToOpenRole(j);
+          const matchingApps = apps.filter((a) => a.job_id === role.id || a.job_id === j.job_id);
+          const totalCount = Math.max(role.applicationsCount || 0, matchingApps.length);
+          const verifyingCount = matchingApps.filter(
+            (a) => a.status === 'SUBMITTED_PENDING_SANDBOX' || a.status === 'EVALUATING'
+          ).length;
+          const readyCount = matchingApps.filter((a) => a.status === 'EVALUATED').length;
+
+          return {
+            ...role,
+            applicationsCount: totalCount,
+            agentApplicationsCount: totalCount,
+            inVerificationCount: Math.max(role.inVerificationCount || 0, verifyingCount),
+            interviewReadyCount: Math.max(role.interviewReadyCount || 0, readyCount),
+          };
+        });
         setRolesList(mapped);
       }
     } catch (e: any) {

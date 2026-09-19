@@ -78,7 +78,8 @@ export interface MCPTool {
   description: string;
   inputParams: string[];
   outputFields: string[];
-  callsToday: number;
+  category: 'DISCOVERY' | 'SPECIFICATION' | 'SUBMISSION' | 'TELEMETRY';
+  operation: 'READ' | 'MUTATE';
 }
 
 export interface MCPActivityLog {
@@ -113,28 +114,32 @@ export const mockMCPTools: MCPTool[] = [
     description: 'Search currently open hiring requisitions by keyword, role title, or required skill signals.',
     inputParams: ['query: string', 'location?: string', 'min_match_fit?: number'],
     outputFields: ['job_id', 'title', 'company', 'requirements', 'mcp_apply_url'],
-    callsToday: 0,
+    category: 'DISCOVERY',
+    operation: 'READ',
   },
   {
     name: 'get_job_requirements',
     description: 'Retrieve exact technical signal requirements and evidence criteria for a specific job.',
     inputParams: ['job_id: string'],
     outputFields: ['required_skills', 'evidence_weights', 'minimum_coverage_percent'],
-    callsToday: 0,
+    category: 'SPECIFICATION',
+    operation: 'READ',
   },
   {
     name: 'apply_to_job',
     description: 'Submit an external candidate report and evidence graph directly to company hiring pipeline.',
     inputParams: ['job_id: string', 'candidate_report_payload: object', 'delegation_signature: string'],
     outputFields: ['application_id', 'status', 'received_timestamp'],
-    callsToday: 0,
+    category: 'SUBMISSION',
+    operation: 'MUTATE',
   },
   {
     name: 'get_application_status',
     description: 'Query state of a submitted application using unique candidate delegation signature.',
     inputParams: ['application_id: string'],
     outputFields: ['status', 'verification_stage', 'last_updated'],
-    callsToday: 0,
+    category: 'TELEMETRY',
+    operation: 'READ',
   },
 ];
 

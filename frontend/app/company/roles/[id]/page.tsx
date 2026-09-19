@@ -156,7 +156,13 @@ export default function RoleDetailPage() {
   }
 
   const roleApplicants = applicants.filter(
-    (c) => c.role.toLowerCase().includes(role.title.toLowerCase().split(' ')[0]) || c.roleId === role.id
+    (c) =>
+      c.roleId === role.id ||
+      c.roleId === roleId ||
+      (c.role && role.title && (
+        c.role.toLowerCase().includes(role.title.toLowerCase().split(' ')[0]) ||
+        role.title.toLowerCase().includes(c.role.toLowerCase().split(' ')[0])
+      ))
   );
 
   const filteredApplicants = roleApplicants.filter((cand) => {
