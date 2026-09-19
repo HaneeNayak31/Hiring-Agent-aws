@@ -1,0 +1,263 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS Fargate MCP server behind an internal NLB and API Gateway HTTPS endpoint.
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: Full ECR image URI including tag.
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  VpcCidr:
+    Type: String
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  JobsTableName:
+    Type: String
+    Default: HiringAgent_Jobs
+  ApplicationsTableName:
+    Type: String
+    Default: HiringAgent_Applications
+  ServiceName:
+    Type: String
+    Default: hiring-agent-mcp
+
+Resources:
+  McpCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ServiceName
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DescribeTable
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JobsTableName}'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${JobsTableName}/index/*'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ApplicationsTableName}'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ApplicationsTableName}/index/*'
+
+  McpLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${ServiceName}'
+      RetentionInDays: 14
+
+  McpTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Ref ServiceName
+      RequiresCompatibilities:
+        - FARGATE
+      NetworkMode: awsvpc
+      Cpu: '512'
+      Memory: '1024'
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: mcp
+          Image: !Ref ImageUri
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8000
+              Protocol: tcp
+          Environment:
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: DYNAMODB_JOBS_TABLE
+              Value: !Ref JobsTableName
+            - Name: DYNAMODB_APPLICATIONS_TABLE
+              Value: !Ref ApplicationsTableName
+            - Name: MCP_HOST
+              Value: 0.0.0.0
+            - Name: MCP_PORT
+              Value: '8000'
+            - Name: MCP_PATH
+              Value: /mcp
+            - Name: MCP_JSON_RESPONSE
+              Value: 'true'
+            - Name: MCP_STATELESS_HTTP
+              Value: 'true'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref McpLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: mcp
+
+  McpSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow MCP traffic from inside the VPC.
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: !Ref VpcCidr
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  McpLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${ServiceName}-nlb'
+      Scheme: internal
+      Type: network
+      Subnets: !Ref SubnetIds
+
+  McpTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${ServiceName}-tg'
+      VpcId: !Ref VpcId
+      TargetType: ip
+      Port: 8000
+      Protocol: TCP
+      HealthCheckEnabled: true
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: '8000'
+      HealthCheckPath: /health
+      Matcher:
+        HttpCode: '200'
+
+  McpLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref McpLoadBalancer
+      Port: 8000
+      Protocol: TCP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref McpTargetGroup
+
+  McpService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - McpLoadBalancerListener
+    Properties:
+      ServiceName: !Ref ServiceName
+      Cluster: !Ref McpCluster
+      LaunchType: FARGATE
+      DesiredCount: 1
+      HealthCheckGracePeriodSeconds: 60
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: !Ref SubnetIds
+          SecurityGroups:
+            - !Ref McpSecurityGroup
+      TaskDefinition: !Ref McpTaskDefinition
+      LoadBalancers:
+        - ContainerName: mcp
+          ContainerPort: 8000
+          TargetGroupArn: !Ref McpTargetGroup
+
+  McpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${ServiceName}-api'
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - '*'
+        AllowHeaders:
+          - '*'
+
+  McpVpcLink:
+    Type: AWS::ApiGatewayV2::VpcLink
+    Properties:
+      Name: !Sub '${ServiceName}-vpc-link'
+      SubnetIds: !Ref SubnetIds
+
+  McpIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref McpApi
+      ConnectionId: !Ref McpVpcLink
+      ConnectionType: VPC_LINK
+      IntegrationType: HTTP_PROXY
+      IntegrationMethod: ANY
+      IntegrationUri: !Ref McpLoadBalancerListener
+      PayloadFormatVersion: '1.0'
+      TimeoutInMillis: 30000
+
+  McpRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref McpApi
+      RouteKey: 'ANY /mcp'
+      Target: !Sub 'integrations/${McpIntegration}'
+
+  McpSubroute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref McpApi
+      RouteKey: 'ANY /mcp/{proxy+}'
+      Target: !Sub 'integrations/${McpIntegration}'
+
+  HealthRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref McpApi
+      RouteKey: 'GET /health'
+      Target: !Sub 'integrations/${McpIntegration}'
+
+  McpStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref McpApi
+      StageName: '$default'
+      AutoDeploy: true
+
+Outputs:
+  McpApiUrl:
+    Description: API Gateway HTTPS base URL.
+    Value: !GetAtt McpApi.ApiEndpoint
+  McpEndpointUrl:
+    Description: HTTPS Streamable HTTP MCP endpoint.
+    Value: !Sub '${McpApi.ApiEndpoint}/mcp'
+  McpHealthUrl:
+    Description: HTTPS health endpoint.
+    Value: !Sub '${McpApi.ApiEndpoint}/health'
+  McpClusterName:
+    Value: !Ref McpCluster
+  McpServiceName:
+    Value: !Ref McpService

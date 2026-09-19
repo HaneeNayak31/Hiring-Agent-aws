@@ -84,6 +84,7 @@ pnpm-debug.log*
 .aws-sam/
 **/.aws-sam/
 serverless_backend/deployment-outputs.json
+MCP/deployment-outputs.json
 
 # ==========================================
 # Operating System & IDEs
