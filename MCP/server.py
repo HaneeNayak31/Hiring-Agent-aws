@@ -7,6 +7,7 @@ Now enriched with native MCP prompts, system instructions, and return-oriented a
 
 from __future__ import annotations
 import json
+import os
 from typing import Optional, List, Dict, Any, Union
 from mcp.server.mcpserver import MCPServer
 from models.passport import CandidatePassport
@@ -334,8 +335,52 @@ def check_application_status(application_id: str) -> Dict[str, Any]:
     return status
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _run_streamable_http() -> None:
+    """Run Streamable HTTP with a health endpoint for container platforms."""
+    import anyio
+    import uvicorn
+    from starlette.responses import JSONResponse
+    from starlette.routing import Route
+
+    async def health(_request):
+        return JSONResponse({"status": "ok", "service": "applicant-mcp-server"})
+
+    async def serve() -> None:
+        host = os.getenv("MCP_HOST", "0.0.0.0")
+        port = int(os.getenv("MCP_PORT", "8000"))
+        path = os.getenv("MCP_PATH", "/mcp")
+        app = server.streamable_http_app(
+            streamable_http_path=path,
+            json_response=_env_bool("MCP_JSON_RESPONSE", True),
+            stateless_http=_env_bool("MCP_STATELESS_HTTP", True),
+            host=host,
+        )
+        app.routes.insert(0, Route("/health", health, methods=["GET"]))
+
+        config = uvicorn.Config(
+            app,
+            host=host,
+            port=port,
+            log_level=server.settings.log_level.lower(),
+        )
+        await uvicorn.Server(config).serve()
+
+    anyio.run(serve)
+
+
 if __name__ == "__main__":
     import sys
+
     transport = sys.argv[1] if len(sys.argv) > 1 else "stdio"
-    server.run(transport=transport)
+    if transport == "streamable-http":
+        _run_streamable_http()
+    else:
+        server.run(transport=transport)
 

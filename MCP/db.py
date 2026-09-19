@@ -1,6 +1,6 @@
 """
 Database abstraction layer and DynamoDB repository for jobs and candidate applications.
-Connects directly to Amazon DynamoDB (with in-memory fallback for local development).
+Connects directly to Amazon DynamoDB.
 Enables DynamoDB Streams on applications for automated sandbox agent evaluation.
 """
 
@@ -9,17 +9,14 @@ import os
 import uuid
 from decimal import Decimal
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any
 import boto3
-from botocore.exceptions import ClientError, BotoCoreError
 from dotenv import load_dotenv
 
 from models.job import (
     JobSummary,
     JobDetail,
     Compensation,
-    SubmissionRequirements,
-    CustomQuestion,
 )
 from models.passport import CandidatePassport
 from models.application import ApplicationSubmission, ApplicationReceipt
@@ -32,97 +29,6 @@ AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 ENDPOINT_URL = os.getenv("DYNAMODB_ENDPOINT_URL")
 JOBS_TABLE_NAME = os.getenv("DYNAMODB_JOBS_TABLE", "HiringAgent_Jobs")
 APPS_TABLE_NAME = os.getenv("DYNAMODB_APPLICATIONS_TABLE", "HiringAgent_Applications")
-
-# Fallback Seed Data: Used if DynamoDB is unreachable or for zero-config offline testing
-JOBS_SEED: Dict[str, JobDetail] = {
-    "job-backend-01": JobDetail(
-        id="job-backend-01",
-        title="Junior Cloud Engineer (Platform & Distributed Systems)",
-        department="Core Infrastructure",
-        location="San Francisco, CA (or Remote US)",
-        workplace_type="remote",
-        employment_type="full-time",
-        experience_level="Junior",
-        min_years_experience=0,
-        compensation=Compensation(
-            min=16000,
-            max=19500,
-            currency="USD",
-            period="yearly"
-        ),
-        primary_skills=["AWS", "Python", "FastAPI", "PostgreSQL", "Docker", "Distributed Systems"],
-        status="active",
-        posted_at="2026-09-15T09:00:00Z",
-        overview=(
-            "Join our Core Infrastructure team to architect resilient, high-throughput backend services. "
-            "You will scale distributed event streams, design resilient data models, and optimize our low-latency APIs."
-        ),
-        full_description_markdown=(
-            "## About The Role\n"
-            "We are seeking an experienced Backend Engineer to lead the architectural evolution of our event-driven systems. "
-            "You will work closely with AI infrastructure engineers, designing APIs handling millions of requests per day.\n\n"
-            "## What You'll Do\n"
-            "- Design, develop, and maintain high-concurrency microservices in Python (AsyncIO, FastAPI) and Go.\n"
-            "- Optimize PostgreSQL queries, index strategies, and partitioning for heavy data pipelines.\n"
-            "- Implement observability pipelines with OpenTelemetry and Prometheus.\n"
-            "- Write clean, thoroughly tested code with robust unit and integration test suites.\n\n"
-            "## Minimum Qualifications\n"
-            "- Deep proficiency in modern Python (AsyncIO, Pydantic, FastAPI) or Go.\n"
-            "- Solid knowledge of relational databases (PostgreSQL) and caching layers (Redis).\n"
-        ),
-        responsibilities=[
-            "Design, build, and maintain mission-critical backend APIs and asynchronous pipelines.",
-            "Architect database schemas and perform query optimization on PostgreSQL.",
-            "Champion automated testing, code quality, and CI/CD best practices.",
-            "Participate in on-call rotations and lead incident post-mortems."
-        ],
-        required_skills=["Python", "FastAPI", "PostgreSQL", "AsyncIO", "Docker", "Git"],
-        preferred_skills=["Redis", "Kafka", "Kubernetes", "OpenTelemetry", "Go"],
-        benefits=[
-            "Competitive base salary + significant equity package",
-            "Comprehensive health, dental, and vision insurance (100% premium covered)",
-            "Flexible remote work environment & $1,500 home office stipend",
-            "Unlimited PTO and paid parental leave"
-        ],
-        submission_requirements=SubmissionRequirements(
-            mandatory_fields=[
-                "fullName", "email", "skills", "experience", "projects", "repositoryUrl"
-            ],
-            optional_fields=[
-                "education.college",
-                "education.degree",
-                "education.cgpa",
-                "education.tenth_result",
-                "education.twelfth_result",
-                "profiles.linkedin",
-                "profiles.leetcode",
-                "profiles.codeforces",
-                "profiles.codechef",
-                "profiles.portfolio",
-                "phone",
-                "location",
-                "summary",
-                "certifications",
-                "coverNote"
-            ],
-            min_projects=1,
-            requires_code_repository=True,
-            required_profiles=["github"],
-            optional_profiles=["linkedin", "leetcode", "codeforces", "codechef", "portfolio"],
-            custom_questions=[
-                CustomQuestion(
-                    id="q_backend_perf",
-                    question="Briefly explain a production performance bottleneck you diagnosed and resolved.",
-                    required=True
-                )
-            ]
-        )
-    ),
-}
-
-# In-memory Application Store (Cache & Local Fallback)
-APPLICATIONS_DB: Dict[str, Dict[str, Any]] = {}
-
 
 def _get_dynamodb_resource():
     """Initializes and returns the boto3 DynamoDB resource."""
@@ -156,8 +62,7 @@ def _decimal_to_native(obj: Any) -> Any:
 
 class HiringDatabase:
     """
-    Data operations for jobs and applications, backed by Amazon DynamoDB
-    with automatic in-memory fallback.
+    Data operations for jobs and applications, backed by Amazon DynamoDB.
     """
 
     @staticmethod
@@ -170,25 +75,19 @@ class HiringDatabase:
     ) -> List[JobSummary]:
         """
         Returns lightweight summaries of all matching active jobs.
-        Queries DynamoDB GSI 'status-posted_at-index', falling back to JOBS_SEED.
+        Queries DynamoDB GSI 'status-posted_at-index'.
         """
         raw_items: List[Dict[str, Any]] = []
 
-        try:
-            dynamodb = _get_dynamodb_resource()
-            table = dynamodb.Table(JOBS_TABLE_NAME)
-            
-            # Query GSI status-posted_at-index
-            response = table.query(
-                IndexName="status-posted_at-index",
-                KeyConditionExpression=boto3.dynamodb.conditions.Key("status").eq(status)
-            )
-            raw_items = response.get("Items", [])
-        except Exception as e:
-            # Fallback to local in-memory seed
-            for job in JOBS_SEED.values():
-                if not status or job.status == status:
-                    raw_items.append(job.model_dump())
+        dynamodb = _get_dynamodb_resource()
+        table = dynamodb.Table(JOBS_TABLE_NAME)
+
+        # Query GSI status-posted_at-index
+        response = table.query(
+            IndexName="status-posted_at-index",
+            KeyConditionExpression=boto3.dynamodb.conditions.Key("status").eq(status)
+        )
+        raw_items = response.get("Items", [])
 
         results: List[JobSummary] = []
         for raw in raw_items:
@@ -246,20 +145,16 @@ class HiringDatabase:
         """
         Fetches complete JobDetail including submission requirements from DynamoDB.
         """
-        try:
-            dynamodb = _get_dynamodb_resource()
-            table = dynamodb.Table(JOBS_TABLE_NAME)
-            response = table.get_item(Key={"job_id": job_id})
-            item = response.get("Item")
-            if item:
-                native_item = _decimal_to_native(item)
-                native_item["id"] = native_item.get("job_id") or native_item.get("id")
-                return JobDetail.model_validate(native_item)
-        except Exception:
-            pass
+        dynamodb = _get_dynamodb_resource()
+        table = dynamodb.Table(JOBS_TABLE_NAME)
+        response = table.get_item(Key={"job_id": job_id})
+        item = response.get("Item")
+        if not item:
+            return None
 
-        # Fallback to in-memory seed
-        return JOBS_SEED.get(job_id)
+        native_item = _decimal_to_native(item)
+        native_item["id"] = native_item.get("job_id") or native_item.get("id")
+        return JobDetail.model_validate(native_item)
 
     @staticmethod
     def validate_passport(job_id: str, passport: CandidatePassport) -> ValidationResult:
@@ -600,17 +495,11 @@ class HiringDatabase:
             }
         }
 
-        # Write to DynamoDB
-        try:
-            dynamodb = _get_dynamodb_resource()
-            table = dynamodb.Table(APPS_TABLE_NAME)
-            table.put_item(Item=_float_to_decimal(record))
-        except Exception as e:
-            # Keep local in-memory fallback updated
-            APPLICATIONS_DB[app_id] = record
-
-        # Also store in local cache
-        APPLICATIONS_DB[app_id] = record
+        # Write to DynamoDB. Any failure is surfaced to the caller because
+        # successful submission must mean durable storage.
+        dynamodb = _get_dynamodb_resource()
+        table = dynamodb.Table(APPS_TABLE_NAME)
+        table.put_item(Item=_float_to_decimal(record))
 
         return ApplicationReceipt(
             application_id=app_id,
@@ -630,27 +519,14 @@ class HiringDatabase:
         """
         Fetches processing status and sandbox verification stage for a submitted application.
         """
-        try:
-            dynamodb = _get_dynamodb_resource()
-            table = dynamodb.Table(APPS_TABLE_NAME)
-            response = table.get_item(Key={"application_id": application_id})
-            item = response.get("Item")
-            if item:
-                app = _decimal_to_native(item)
-                return {
-                    "application_id": app["application_id"],
-                    "job_id": app["job_id"],
-                    "job_title": app["job_title"],
-                    "status": app["status"],
-                    "submitted_at": app["submitted_at"],
-                    "sandbox_status": app.get("verification_pipeline", {}).get("sandbox_status", "UNKNOWN")
-                }
-        except Exception:
-            pass
-
-        app = APPLICATIONS_DB.get(application_id)
-        if not app:
+        dynamodb = _get_dynamodb_resource()
+        table = dynamodb.Table(APPS_TABLE_NAME)
+        response = table.get_item(Key={"application_id": application_id})
+        item = response.get("Item")
+        if not item:
             return None
+
+        app = _decimal_to_native(item)
         return {
             "application_id": app["application_id"],
             "job_id": app["job_id"],
@@ -666,37 +542,25 @@ class HiringDatabase:
         Queries all candidate applications submitted for a specific job requisition.
         Powers the Recruiter / HR applicants pipeline.
         """
-        try:
-            dynamodb = _get_dynamodb_resource()
-            table = dynamodb.Table(APPS_TABLE_NAME)
-            response = table.query(
-                IndexName="job_id-submitted_at-index",
-                KeyConditionExpression=boto3.dynamodb.conditions.Key("job_id").eq(job_id)
-            )
-            items = response.get("Items", [])
-            return [_decimal_to_native(item) for item in items]
-        except Exception:
-            # In-memory fallback
-            return [
-                app for app in APPLICATIONS_DB.values()
-                if app.get("job_id") == job_id
-            ]
+        dynamodb = _get_dynamodb_resource()
+        table = dynamodb.Table(APPS_TABLE_NAME)
+        response = table.query(
+            IndexName="job_id-submitted_at-index",
+            KeyConditionExpression=boto3.dynamodb.conditions.Key("job_id").eq(job_id)
+        )
+        items = response.get("Items", [])
+        return [_decimal_to_native(item) for item in items]
 
     @staticmethod
     def get_application(application_id: str) -> Optional[Dict[str, Any]]:
         """
         Fetches the complete candidate application record.
         """
-        try:
-            dynamodb = _get_dynamodb_resource()
-            table = dynamodb.Table(APPS_TABLE_NAME)
-            response = table.get_item(Key={"application_id": application_id})
-            item = response.get("Item")
-            if item:
-                return _decimal_to_native(item)
-        except Exception:
-            pass
-        return APPLICATIONS_DB.get(application_id)
+        dynamodb = _get_dynamodb_resource()
+        table = dynamodb.Table(APPS_TABLE_NAME)
+        response = table.get_item(Key={"application_id": application_id})
+        item = response.get("Item")
+        return _decimal_to_native(item) if item else None
 
     @staticmethod
     def update_application_evaluation(
@@ -709,34 +573,26 @@ class HiringDatabase:
         Updates an application record post-sandbox evaluation with S3 links and metrics.
         """
         now_iso = datetime.now(timezone.utc).isoformat()
-        try:
-            dynamodb = _get_dynamodb_resource()
-            table = dynamodb.Table(APPS_TABLE_NAME)
-            table.update_item(
-                Key={"application_id": application_id},
-                UpdateExpression="""
-                    SET #status = :status,
-                        report_s3_url = :r_url,
-                        trace_s3_url = :t_url,
-                        evaluated_at = :eval_at,
-                        evaluation_summary = :summary,
-                        verification_pipeline.sandbox_status = :s_status
-                """,
-                ExpressionAttributeNames={"#status": "status"},
-                ExpressionAttributeValues={
-                    ":status": "EVALUATED",
-                    ":r_url": report_s3_url,
-                    ":t_url": trace_s3_url,
-                    ":eval_at": now_iso,
-                    ":summary": _float_to_decimal(evaluation_summary),
-                    ":s_status": "COMPLETED"
-                }
-            )
-            return True
-        except Exception:
-            if application_id in APPLICATIONS_DB:
-                APPLICATIONS_DB[application_id]["status"] = "EVALUATED"
-                APPLICATIONS_DB[application_id]["report_s3_url"] = report_s3_url
-                APPLICATIONS_DB[application_id]["trace_s3_url"] = trace_s3_url
-                APPLICATIONS_DB[application_id]["evaluation_summary"] = evaluation_summary
-            return True
+        dynamodb = _get_dynamodb_resource()
+        table = dynamodb.Table(APPS_TABLE_NAME)
+        table.update_item(
+            Key={"application_id": application_id},
+            UpdateExpression="""
+                SET #status = :status,
+                    report_s3_url = :r_url,
+                    trace_s3_url = :t_url,
+                    evaluated_at = :eval_at,
+                    evaluation_summary = :summary,
+                    verification_pipeline.sandbox_status = :s_status
+            """,
+            ExpressionAttributeNames={"#status": "status"},
+            ExpressionAttributeValues={
+                ":status": "EVALUATED",
+                ":r_url": report_s3_url,
+                ":t_url": trace_s3_url,
+                ":eval_at": now_iso,
+                ":summary": _float_to_decimal(evaluation_summary),
+                ":s_status": "COMPLETED"
+            }
+        )
+        return True
