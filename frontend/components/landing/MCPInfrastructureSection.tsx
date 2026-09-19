@@ -1,16 +1,14 @@
-// components/MCPInfrastructureSection.tsx
 'use client';
 
 import { motion } from 'framer-motion';
 import { mockMCPTools } from '@/data/mockData';
-import { Server, Code, Terminal, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Server, Terminal, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default function MCPInfrastructureSection() {
   return (
     <section className="bg-black text-white py-28 px-6 border-b border-white/15 relative font-mono">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="mb-16">
           <span className="font-mono text-xs text-primary uppercase tracking-widest block mb-3 font-bold">
             // Developer Protocol Layer
@@ -25,7 +23,6 @@ export default function MCPInfrastructureSection() {
           </p>
         </div>
 
-        {/* MCP Tools Grid */}
         <div className="grid md:grid-cols-2 gap-6 mb-12">
           {mockMCPTools.map((tool, idx) => (
             <motion.div

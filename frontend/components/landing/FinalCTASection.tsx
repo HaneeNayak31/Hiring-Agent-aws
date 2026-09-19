@@ -1,8 +1,6 @@
-// components/FinalCTASection.tsx
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, Server, ShieldCheck } from 'lucide-react';
 
 export default function FinalCTASection() {
   return (

@@ -1,15 +1,13 @@
-// components/Hero.tsx
 'use client';
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Cpu, Server, CheckCircle2, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Cpu, Server, CheckCircle2, ArrowRight } from 'lucide-react';
 
-const Hero = () => {
+export default function Hero() {
   return (
     <section className="bg-black text-white py-24 md:py-32 overflow-hidden relative border-b border-white/15">
       <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center px-6">
-        {/* Editorial Text Block */}
         <motion.div
           initial={{ opacity: 0, x: -40 }}
           animate={{ opacity: 1, x: 0 }}
@@ -50,7 +48,6 @@ const Hero = () => {
           </div>
         </motion.div>
 
-        {/* Abstract Infrastructure Diagram (Section 7) */}
         <motion.div
           className="relative"
           initial={{ opacity: 0, scale: 0.95 }}
@@ -65,9 +62,7 @@ const Hero = () => {
               </span>
             </div>
 
-            {/* Protocol Stack Visual */}
             <div className="space-y-5">
-              {/* Node 1: Candidate */}
               <div className="flex items-center justify-between p-4 border border-white/20 bg-black">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-white" />
@@ -79,10 +74,8 @@ const Hero = () => {
                 <span className="text-[10px] text-white/40">USER AGENT</span>
               </div>
 
-              {/* Line connector */}
               <div className="h-5 w-px bg-gradient-to-b from-white/40 to-primary ml-5" />
 
-              {/* Node 2: Personal AI Agent */}
               <div className="flex items-center justify-between p-4 border-2 border-primary bg-primary/10">
                 <div className="flex items-center gap-3">
                   <Cpu className="w-4 h-4 text-primary animate-pulse" />
@@ -94,10 +87,8 @@ const Hero = () => {
                 <span className="text-xs px-2 py-0.5 bg-primary text-black font-bold">EXTERNAL</span>
               </div>
 
-              {/* Line connector */}
               <div className="h-5 w-px bg-gradient-to-b from-primary to-white ml-5" />
 
-              {/* Node 3: Hiring MCP Server */}
               <div className="flex items-center justify-between p-4 border border-white/30 bg-white/10">
                 <div className="flex items-center gap-3">
                   <Server className="w-4 h-4 text-white" />
@@ -109,10 +100,8 @@ const Hero = () => {
                 <span className="text-xs text-emerald-400 font-bold">mcp.company/hiring</span>
               </div>
 
-              {/* Line connector */}
               <div className="h-5 w-px bg-gradient-to-b from-white to-emerald-400 ml-5" />
 
-              {/* Node 4: Company Control Room */}
               <div className="flex items-center justify-between p-4 border border-emerald-500/40 bg-emerald-500/5">
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -128,10 +117,7 @@ const Hero = () => {
         </motion.div>
       </div>
 
-      {/* Texture overlay */}
       <div className="absolute inset-0 pointer-events-none bg-[url('/texture/halftone.svg')] opacity-10" />
     </section>
   );
-};
-
-export default Hero;
+}

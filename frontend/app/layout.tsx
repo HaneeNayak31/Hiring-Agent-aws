@@ -1,4 +1,3 @@
-// app/layout.tsx
 import './globals.css';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -24,7 +23,6 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen flex flex-col bg-black text-white font-sans antialiased selection:bg-primary selection:text-black">
-        {/* Global Navigation Header */}
         <header className="border-b border-white/15 py-4 px-6 md:px-12 flex items-center justify-between sticky top-0 bg-black/90 backdrop-blur-md z-50">
           <Link href="/" className="flex items-center gap-2 group">
             <span className="px-2 py-0.5 bg-primary text-black font-mono text-xs font-bold tracking-widest">
@@ -35,7 +33,6 @@ export default function RootLayout({
             </span>
           </Link>
 
-          {/* Clean, Relevant Navigation Links */}
           <nav className="hidden md:flex items-center gap-8 font-mono text-xs uppercase tracking-wider text-white/70">
             <Link href="/" className="hover:text-primary transition-colors">Overview</Link>
             <Link href="/#how-it-works" className="hover:text-primary transition-colors">How It Works</Link>
@@ -56,7 +53,6 @@ export default function RootLayout({
 
         <main className="flex-1">{children}</main>
 
-        {/* Minimal Footer */}
         <footer className="border-t border-white/15 py-10 px-6 md:px-12 bg-black font-mono text-xs text-white/50">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
             <div>

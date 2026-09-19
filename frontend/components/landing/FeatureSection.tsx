@@ -1,4 +1,3 @@
-// components/FeatureSection.tsx
 'use client';
 
 import { motion } from 'framer-motion';
@@ -13,7 +12,7 @@ const features = [
     subtitle: 'No self-reported claims. Only verified proof.',
     description:
       'Skills are automatically validated against real code repositories, live production architecture, and verified project output. Recruiters inspect root evidence in seconds.',
-    href: '/recruiter/candidates/cand-1',
+    href: '/company/candidates/cand-1',
     actionText: 'View Candidate Workspace',
   },
   {
@@ -33,7 +32,7 @@ const features = [
     subtitle: 'Zero fluff packets for engineering leads.',
     description:
       'Recruiters and hiring managers receive pre-compiled technical briefing packets highlighting confirmed competencies, potential gap areas, and targeted probe questions.',
-    href: '/recruiter/candidates/cand-1/brief',
+    href: '/company/candidates/cand-1/brief',
     actionText: 'Open Sample Briefing',
   },
 ];
@@ -42,7 +41,6 @@ export default function FeatureSection() {
   return (
     <section className="bg-offWhite text-black py-28 px-6 border-b border-black">
       <div className="max-w-6xl mx-auto">
-        {/* Section Header */}
         <div className="mb-20">
           <span className="font-mono text-xs tracking-widest text-primary uppercase block mb-3">
             // Core Architecture
@@ -54,7 +52,6 @@ export default function FeatureSection() {
           </h2>
         </div>
 
-        {/* Features Stack */}
         <div className="space-y-12">
           {features.map((feat, idx) => {
             const IconComponent = feat.icon;

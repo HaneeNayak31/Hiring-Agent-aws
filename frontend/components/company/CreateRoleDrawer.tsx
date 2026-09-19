@@ -1,4 +1,3 @@
-// components/CreateRoleDrawer.tsx
 'use client';
 
 import { useState } from 'react';
@@ -63,7 +62,6 @@ export default function CreateRoleDrawer({ isOpen, onClose, onSave }: CreateRole
           className="w-full max-w-lg bg-black border-l-2 border-white h-full overflow-y-auto p-8 flex flex-col justify-between shadow-[-10px_0_25px_rgba(0,0,0,0.8)]"
         >
           <div>
-            {/* Header */}
             <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/20">
               <span className="text-xs font-bold text-primary tracking-widest uppercase">
                 // PUBLISH AGENT-ACCESSIBLE ROLE
@@ -84,7 +82,6 @@ export default function CreateRoleDrawer({ isOpen, onClose, onSave }: CreateRole
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Group 1: ROLE */}
                 <div>
                   <div className="text-[10px] text-primary uppercase font-bold tracking-wider mb-3">// 01 ROLE DETAILS</div>
                   <div className="space-y-3">
@@ -135,7 +132,6 @@ export default function CreateRoleDrawer({ isOpen, onClose, onSave }: CreateRole
                   </div>
                 </div>
 
-                {/* Group 2: DESCRIPTION */}
                 <div>
                   <div className="text-[10px] text-primary uppercase font-bold tracking-wider mb-3">// 02 DESCRIPTION</div>
                   <textarea
@@ -147,7 +143,6 @@ export default function CreateRoleDrawer({ isOpen, onClose, onSave }: CreateRole
                   />
                 </div>
 
-                {/* Group 3: REQUIREMENTS */}
                 <div>
                   <div className="text-[10px] text-primary uppercase font-bold tracking-wider mb-3">// 03 REQUIREMENTS</div>
                   <div className="space-y-3">
@@ -173,7 +168,6 @@ export default function CreateRoleDrawer({ isOpen, onClose, onSave }: CreateRole
                   </div>
                 </div>
 
-                {/* Group 4: PUBLISH */}
                 <div className="pt-4 border-t border-white/10">
                   <div className="p-3 border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[11px] mb-4 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 shrink-0" />

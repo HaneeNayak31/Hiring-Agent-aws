@@ -28,7 +28,7 @@ from models.validation import ValidationResult, HighImpactRecommendation
 load_dotenv()
 
 # AWS Configuration
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 ENDPOINT_URL = os.getenv("DYNAMODB_ENDPOINT_URL")
 JOBS_TABLE_NAME = os.getenv("DYNAMODB_JOBS_TABLE", "HiringAgent_Jobs")
 APPS_TABLE_NAME = os.getenv("DYNAMODB_APPLICATIONS_TABLE", "HiringAgent_Applications")

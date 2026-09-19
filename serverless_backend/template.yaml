@@ -10,26 +10,25 @@ Parameters:
     Type: String
     Default: dev
     Description: Environment stage (dev, staging, prod)
-  OpenAIApiKey:
-    Type: String
-    NoEcho: true
-    Default: "sk-mock-key"
-    Description: OpenAI API Key for candidate assessment agent
 
 Globals:
   Function:
     Timeout: 60
     MemorySize: 512
-    Runtime: python3.12
     Environment:
       Variables:
-        AWS_REGION: !Ref AWS::Region
         DYNAMODB_JOBS_TABLE: !Ref JobsTable
         DYNAMODB_APPLICATIONS_TABLE: !Ref ApplicationsTable
         S3_ASSESSMENT_BUCKET: !Ref AssessmentsBucket
-        OPENAI_API_KEY: !Ref OpenAIApiKey
+        OPENAI_API_KEY_SECRET_ARN: !Ref OpenAIApiSecret
 
 Resources:
+  OpenAIApiSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: OpenAI API key for the candidate evaluator. Populate after deployment.
+      SecretString: '{"OPENAI_API_KEY":""}'
+
   # ==============================================================================
   # 1. DynamoDB Tables
   # ==============================================================================
@@ -92,6 +91,15 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "hiring-agent-assessments-${AWS::AccountId}-${AWS::Region}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders:
@@ -110,10 +118,11 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: HiringAgent_CandidateEvaluator
-      CodeUri: evaluator_function/
-      Handler: handler.lambda_handler
+      PackageType: Image
       Timeout: 900
       MemorySize: 1024
+      Architectures:
+        - x86_64
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ApplicationsTable
@@ -121,6 +130,11 @@ Resources:
             TableName: !Ref JobsTable
         - S3CrudPolicy:
             BucketName: !Ref AssessmentsBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref OpenAIApiSecret
       Events:
         ApplicationStream:
           Type: DynamoDB
@@ -131,6 +145,10 @@ Resources:
             FilterCriteria:
               Filters:
                 - Pattern: '{"eventName": ["INSERT"]}'
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: evaluator_function
+      DockerTag: latest
 
   # ==============================================================================
   # 4. Recruiter HTTP API & Lambda Function
@@ -142,6 +160,7 @@ Resources:
         AllowMethods:
           - GET
           - POST
+          - PATCH
           - OPTIONS
         AllowHeaders:
           - "*"
@@ -152,14 +171,15 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: HiringAgent_RecruiterApi
+      Runtime: python3.12
       CodeUri: api_function/
       Handler: app.handler
       Timeout: 30
       MemorySize: 512
       Policies:
-        - DynamoDBReadPolicy:
+        - DynamoDBCrudPolicy:
             TableName: !Ref ApplicationsTable
-        - DynamoDBReadPolicy:
+        - DynamoDBCrudPolicy:
             TableName: !Ref JobsTable
         - S3ReadPolicy:
             BucketName: !Ref AssessmentsBucket
@@ -187,3 +207,6 @@ Outputs:
   CandidateEvaluatorFunctionArn:
     Description: Candidate Evaluator Lambda Function ARN
     Value: !GetAtt CandidateEvaluatorFunction.Arn
+  OpenAIApiSecretArn:
+    Description: Secrets Manager ARN to populate with the real OpenAI API key
+    Value: !Ref OpenAIApiSecret

@@ -1,8 +1,7 @@
-// components/ProblemSection.tsx
 'use client';
 
 import { motion } from 'framer-motion';
-import { ArrowRight, ArrowDown, Check, X } from 'lucide-react';
+import { ArrowDown, Check, X } from 'lucide-react';
 
 const todaySteps = [
   'Candidate',
@@ -25,7 +24,6 @@ export default function ProblemSection() {
   return (
     <section id="how-it-works" className="bg-white text-black py-28 px-6 border-t border-b border-black">
       <div className="max-w-6xl mx-auto">
-        {/* Section Header */}
         <div className="mb-20">
           <span className="font-mono text-xs tracking-widest text-primary uppercase block mb-3">
             // Paradigm Shift
@@ -37,9 +35,7 @@ export default function ProblemSection() {
           </h2>
         </div>
 
-        {/* Comparative Narrative */}
         <div className="grid md:grid-cols-2 gap-16 items-start">
-          {/* TODAY */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -77,7 +73,6 @@ export default function ProblemSection() {
             </p>
           </motion.div>
 
-          {/* THE NEXT INTERNET */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}

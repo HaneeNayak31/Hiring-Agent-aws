@@ -1,13 +1,12 @@
-// components/assistant-ui/HRAgentThread.tsx
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, RefreshCw, User, Bot, FileText, ArrowRight, CornerDownLeft, Play, Terminal } from 'lucide-react';
+import { Send, Sparkles, RefreshCw, User, Bot, Play } from 'lucide-react';
 import TopSessionBar from './TopSessionBar';
 import ReasoningBlock from './ReasoningBlock';
 import TerminalExecutionBlock from './TerminalExecutionBlock';
 import ToolCallBlock from './ToolCallBlock';
-import { AgentSessionState, AgentWorkItem, AssistantMessageItem } from './types';
+import { AgentSessionState, AssistantMessageItem } from './types';
 
 interface HRAgentThreadProps {
   session: AgentSessionState;
@@ -15,6 +14,8 @@ interface HRAgentThreadProps {
   roleTitle: string;
   repoUrl?: string;
   isStreaming?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   onRunEvaluation?: (instructions?: string) => Promise<void> | void;
   onOpenReport?: () => void;
 }
@@ -25,6 +26,8 @@ export default function HRAgentThread({
   roleTitle,
   repoUrl,
   isStreaming = false,
+  error = null,
+  onRetry,
   onRunEvaluation,
   onOpenReport,
 }: HRAgentThreadProps) {
@@ -39,7 +42,6 @@ export default function HRAgentThread({
     'Generate targeted technical interview questions',
   ];
 
-  // Auto-scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -77,12 +79,9 @@ export default function HRAgentThread({
 
   return (
     <div className="flex flex-col h-full bg-black border border-white/15 text-white font-sans overflow-hidden">
-      {/* Top Session Telemetry Bar */}
       <TopSessionBar session={session} />
 
-      {/* Main Stream & Chat Viewport */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs">
-        {/* Live Evaluation Trigger Header Card */}
         <div className="border-2 border-primary bg-primary/5 p-4 font-mono text-xs flex flex-wrap items-center justify-between gap-3 shadow-[4px_4px_0px_0px_rgba(255,106,0,0.8)]">
           <div>
             <div className="font-bold text-white uppercase flex items-center gap-2">
@@ -119,7 +118,24 @@ export default function HRAgentThread({
           </button>
         </div>
 
-        {/* Intro Goal Pill */}
+        {error && (
+          <div className="border border-red-500/60 bg-red-950/30 p-4 text-xs font-mono text-red-300 flex items-start justify-between gap-3 shadow-[4px_4px_0px_0px_rgba(239,68,68,0.3)]">
+            <div>
+              <span className="font-bold uppercase text-red-400 block mb-1">// AGENT EVALUATION STREAM FAILED</span>
+              <p className="text-white/80">{error}</p>
+            </div>
+            {(onRetry || onRunEvaluation) && (
+              <button
+                type="button"
+                onClick={() => (onRetry ? onRetry() : onRunEvaluation?.())}
+                className="px-3 py-1.5 bg-red-500 hover:bg-white text-black font-bold text-xs uppercase transition shrink-0"
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="border border-white/15 bg-white/[0.02] p-3 text-white/60 font-mono text-[11px] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
@@ -132,7 +148,6 @@ export default function HRAgentThread({
           <span className="text-white/30">SESSION: {session.sessionId.slice(0, 18)}...</span>
         </div>
 
-        {/* Replay Background Audit Turns */}
         {session.turns.map((turn) => (
           <div key={turn.id} className="space-y-3 pt-2">
             <div className="flex items-center gap-2 text-white/40 text-[10px] font-bold uppercase tracking-wider pb-1 border-b border-white/10">
@@ -159,10 +174,9 @@ export default function HRAgentThread({
                     </div>
                     <div className="whitespace-pre-wrap">{item.content}</div>
 
-                    {/* Quick Link to open the Report */}
                     {onOpenReport && (
                       <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between font-mono text-[11px]">
-                        <span className="text-white/50">Full evidence report published (14.7 KB)</span>
+                        <span className="text-white/50">Full evidence report published</span>
                         <button
                           type="button"
                           onClick={onOpenReport}
@@ -180,7 +194,6 @@ export default function HRAgentThread({
           </div>
         ))}
 
-        {/* Dynamic Follow-Up Messages */}
         {messages.length > 0 && (
           <div className="space-y-4 pt-4 border-t border-white/15">
             <div className="flex items-center gap-2 text-white/40 text-[10px] font-bold uppercase tracking-wider">
@@ -220,7 +233,6 @@ export default function HRAgentThread({
           </div>
         )}
 
-        {/* Streaming Indicator */}
         {isStreaming && (
           <div className="flex items-center gap-2.5 p-3 bg-white/[0.02] border border-white/10 font-mono text-xs text-white/60">
             <RefreshCw className="w-3.5 h-3.5 text-primary animate-spin" />
@@ -231,7 +243,6 @@ export default function HRAgentThread({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Prompt Pills */}
       <div className="px-4 py-2 bg-black border-t border-white/10 flex items-center gap-2 overflow-x-auto no-scrollbar">
         <span className="text-[10px] font-mono text-white/40 uppercase shrink-0">SUGGESTIONS:</span>
         {starterPills.map((pill, idx) => (
@@ -247,7 +258,6 @@ export default function HRAgentThread({
         ))}
       </div>
 
-      {/* Interactive Composer */}
       <div className="p-3 bg-black border-t border-white/15">
         <div className="relative flex items-center bg-white/[0.03] border border-white/20 focus-within:border-primary transition-colors">
           <span className="pl-3 font-mono text-xs text-primary font-bold select-none">

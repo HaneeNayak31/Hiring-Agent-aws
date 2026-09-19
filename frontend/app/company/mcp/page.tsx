@@ -1,15 +1,45 @@
-// app/company/mcp/page.tsx
 'use client';
 
-import CompanyNav from '@/components/CompanyNav';
-import Breadcrumbs from '@/components/Breadcrumbs';
-import { mockMCPTools, mockMCPLogs, mockRoles, MCPTool } from '@/data/mockData';
-import { useState } from 'react';
-import { Server, Terminal, Code, Activity, ShieldCheck, CheckCircle2, ArrowRight, Lock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
+import { Terminal, Code, Activity, Loader2 } from 'lucide-react';
+import { CompanyNav, Breadcrumbs } from '@/components/layout';
+import ApiErrorBanner from '@/components/layout/ApiErrorBanner';
+import { mockMCPTools, mockMCPLogs, MCPTool, OpenRole } from '@/data/mockData';
+import { fetchJobs, fetchApplications, ApiError } from '@/data/apiClient';
+import { mapJobDetailToOpenRole } from '@/data/schemaAdapter';
+import Link from 'next/link';
 
 export default function InfrastructureMCPPage() {
   const [selectedTool, setSelectedTool] = useState<MCPTool>(mockMCPTools[0]);
+  const [roles, setRoles] = useState<OpenRole[]>([]);
+  const [applicationsCount, setApplicationsCount] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState<ApiError | string | null>(null);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setApiError(null);
+    try {
+      const [jobsRes, appsRes] = await Promise.all([
+        fetchJobs(),
+        fetchApplications(),
+      ]);
+      if (jobsRes) {
+        setRoles(jobsRes.map(mapJobDetailToOpenRole));
+      }
+      if (appsRes) {
+        setApplicationsCount(appsRes.length);
+      }
+    } catch (err: any) {
+      setApiError(err instanceof ApiError ? err : (err?.message || 'Failed to load MCP infrastructure data'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   return (
     <div className="min-h-screen bg-black text-white font-sans">
@@ -18,7 +48,6 @@ export default function InfrastructureMCPPage() {
       <main className="max-w-7xl mx-auto px-6 py-10">
         <Breadcrumbs items={[{ label: 'INFRASTRUCTURE' }]} />
 
-        {/* Header */}
         <div className="border-b border-white/15 pb-8 mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
           <div>
             <div className="flex items-center gap-3 text-xs text-primary mb-2 font-bold uppercase">
@@ -31,53 +60,74 @@ export default function InfrastructureMCPPage() {
           </div>
 
           <div className="text-xs text-white/50 border border-white/15 p-4 bg-white/[0.02]">
-            <div>ENDPOINT: <span className="text-white font-bold">mcp.stripe.com/hiring</span></div>
+            <div>PROTOCOL: <span className="text-white font-bold">AWS Lambda HTTP API Gateway</span></div>
             <div>STATUS: <span className="text-emerald-400 font-bold">● ONLINE (v1.4)</span></div>
           </div>
         </div>
 
-        {/* MCP Telemetry Bar */}
+        <ApiErrorBanner
+          error={apiError}
+          onRetry={loadData}
+          title="Infrastructure Telemetry Sync Error"
+          className="mb-8"
+        />
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 font-mono text-xs">
           <div className="border border-white/15 bg-white/[0.02] p-6">
-            <span className="text-white/40 block text-[10px] uppercase">// ACTIVE AI AGENTS</span>
-            <span className="font-bold text-4xl text-primary mt-1 block">24</span>
-            <span className="text-white/50 text-[11px] mt-2 block">Claude, ChatGPT, Gemini agents connected</span>
+            <span className="text-white/40 block text-[10px] uppercase">// EXPOSED ROLES</span>
+            <span className="font-bold text-4xl text-primary mt-1 block">{roles.length}</span>
+            <span className="text-white/50 text-[11px] mt-2 block">Live requisitions querying DynamoDB</span>
           </div>
 
           <div className="border border-white/15 bg-white/[0.02] p-6">
-            <span className="text-white/40 block text-[10px] uppercase">// MCP REQUESTS TODAY</span>
-            <span className="font-bold text-4xl text-white mt-1 block">1,284</span>
+            <span className="text-white/40 block text-[10px] uppercase">// MCP TOOLS ACTIVE</span>
+            <span className="font-bold text-4xl text-white mt-1 block">{mockMCPTools.length}</span>
             <span className="text-white/50 text-[11px] mt-2 block">Protocol queries & capability evaluations</span>
           </div>
 
           <div className="border border-white/15 bg-white/[0.02] p-6">
             <span className="text-white/40 block text-[10px] uppercase">// APPLICATIONS VIA AGENTS</span>
-            <span className="font-bold text-4xl text-emerald-400 mt-1 block">47</span>
-            <span className="text-white/50 text-[11px] mt-2 block">Verified evidence payloads registered</span>
+            <span className="font-bold text-4xl text-emerald-400 mt-1 block">{applicationsCount}</span>
+            <span className="text-white/50 text-[11px] mt-2 block">Candidate evidence records registered</span>
           </div>
         </div>
 
-        {/* SECTION 27: EXPOSED ROLES MCP CONNECTION */}
         <div className="border border-white/15 bg-black p-8 font-mono text-xs mb-12">
           <h2 className="font-bold text-sm uppercase text-white mb-4 pb-3 border-b border-white/10">
             // EXPOSED HIRING REQUISITION ENDPOINTS
           </h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            {mockRoles.map((r) => (
-              <div key={r.id} className="p-4 border border-white/10 bg-white/[0.02] flex items-center justify-between">
-                <div>
-                  <div className="font-bold text-white font-sans text-sm">{r.title}</div>
-                  <div className="text-[10px] text-white/40">{r.mcpEndpoint}</div>
+          {isLoading ? (
+            <div className="py-8 flex items-center justify-center gap-2 text-white/50">
+              <Loader2 className="w-4 h-4 text-primary animate-spin" />
+              <span>Checking active roles...</span>
+            </div>
+          ) : roles.length === 0 ? (
+            <div className="text-center py-8 border border-dashed border-white/15">
+              <p className="text-white/40 mb-3">NO HIRING REQUISITIONS EXPOSED YET</p>
+              <Link
+                href="/company/roles"
+                className="px-4 py-2 bg-white text-black font-bold text-xs uppercase hover:bg-primary transition inline-block"
+              >
+                + Create First Role
+              </Link>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-4">
+              {roles.map((r) => (
+                <div key={r.id} className="p-4 border border-white/10 bg-white/[0.02] flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-white font-sans text-sm">{r.title}</div>
+                    <div className="text-[10px] text-white/40">{r.mcpEndpoint}</div>
+                  </div>
+                  <span className={`px-2 py-0.5 font-bold uppercase text-[10px] border ${r.mcpExposed ? 'border-emerald-500/40 text-emerald-400' : 'border-amber-500/40 text-amber-400'}`}>
+                    {r.mcpExposed ? '● PUBLIC TO AGENTS' : '○ PAUSED'}
+                  </span>
                 </div>
-                <span className={`px-2 py-0.5 font-bold uppercase text-[10px] border ${r.mcpExposed ? 'border-emerald-500/40 text-emerald-400' : 'border-amber-500/40 text-amber-400'}`}>
-                  {r.mcpExposed ? '● PUBLIC TO AGENTS' : '○ PAUSED'}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* SECTION 25: MCP TOOL INSPECTOR */}
         <div className="border-2 border-white bg-black p-8 mb-12 font-mono shadow-[8px_8px_0px_0px_rgba(255,106,0,1)]">
           <div className="flex items-center justify-between pb-6 mb-8 border-b border-white/20">
             <div className="flex items-center gap-3">
@@ -103,7 +153,7 @@ export default function InfrastructureMCPPage() {
                   }`}
                 >
                   <div className="text-xs uppercase mb-1 font-mono">{tool.name}</div>
-                  <div className="text-[10px] opacity-70">{tool.callsToday} calls today</div>
+                  <div className="text-[10px] opacity-70">{tool.callsToday} calls</div>
                 </button>
               );
             })}
@@ -152,7 +202,6 @@ export default function InfrastructureMCPPage() {
           </div>
         </div>
 
-        {/* SECTION 28: LIVE TELEMETRY LOG */}
         <div className="border border-white/15 bg-black p-8 font-mono">
           <div className="flex items-center justify-between pb-6 mb-6 border-b border-white/15">
             <div className="flex items-center gap-2 text-xs text-primary font-bold uppercase">
@@ -163,30 +212,36 @@ export default function InfrastructureMCPPage() {
           </div>
 
           <div className="space-y-4">
-            {mockMCPLogs.map((log) => (
-              <div
-                key={log.id}
-                className="border-b border-white/10 pb-4 last:border-0 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs"
-              >
-                <div className="flex items-start gap-4">
-                  <span className="text-white/40 shrink-0">{log.timestamp}</span>
-                  <span className="px-2 py-0.5 bg-primary/20 text-primary border border-primary/40 font-bold shrink-0">
-                    {log.toolName}
-                  </span>
-                  <div>
-                    <span className="text-white font-bold">{log.agentName}</span>
-                    <span className="text-white/50"> · {log.roleTarget}</span>
-                    <p className="text-white/70 font-sans mt-1">{log.details}</p>
+            {mockMCPLogs.length === 0 ? (
+              <div className="text-center py-8 text-white/40 text-xs border border-dashed border-white/10">
+                No external MCP agent calls recorded yet. Activity will stream here when candidate evaluation agents execute.
+              </div>
+            ) : (
+              mockMCPLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="border-b border-white/10 pb-4 last:border-0 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs"
+                >
+                  <div className="flex items-start gap-4">
+                    <span className="text-white/40 shrink-0">{log.timestamp}</span>
+                    <span className="px-2 py-0.5 bg-primary/20 text-primary border border-primary/40 font-bold shrink-0">
+                      {log.toolName}
+                    </span>
+                    <div>
+                      <span className="text-white font-bold">{log.agentName}</span>
+                      <span className="text-white/50"> · {log.roleTarget}</span>
+                      <p className="text-white/70 font-sans mt-1">{log.details}</p>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0">
+                    <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
+                      {log.status}
+                    </span>
                   </div>
                 </div>
-
-                <div className="shrink-0">
-                  <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
-                    {log.status}
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </main>

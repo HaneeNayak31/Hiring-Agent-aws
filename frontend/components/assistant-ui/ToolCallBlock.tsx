@@ -1,8 +1,7 @@
-// components/assistant-ui/ToolCallBlock.tsx
 'use client';
 
 import { useState } from 'react';
-import { Wrench, ChevronDown, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Wrench, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { ToolCallItem } from './types';
 
 interface ToolCallBlockProps {
@@ -69,7 +68,6 @@ export default function ToolCallBlock({ item }: ToolCallBlockProps) {
 
       {isExpanded && (
         <div className="p-3.5 border-t border-white/10 space-y-3 bg-white/[0.01]">
-          {/* Inputs */}
           <div>
             <span className="text-[10px] text-white/40 uppercase tracking-wider block mb-1">
               INPUT PARAMETERS:
@@ -79,7 +77,6 @@ export default function ToolCallBlock({ item }: ToolCallBlockProps) {
             </pre>
           </div>
 
-          {/* Outputs */}
           {item.output && (
             <div>
               <span className="text-[10px] text-emerald-400 uppercase tracking-wider block mb-1">

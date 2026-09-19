@@ -287,7 +287,7 @@ def submit_application(
     passport: Union[CandidatePassport, str, Dict[str, Any]],
     cover_note: Optional[str] = None,
     custom_answers: Optional[Union[Dict[str, str], str]] = None,
-    confirmed_by_candidate: bool = True
+    confirmed_by_candidate: bool = False
 ) -> Dict[str, Any]:
     """
     Submits a candidate's verified application for a role.

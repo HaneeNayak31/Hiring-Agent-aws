@@ -1,9 +1,8 @@
-// components/RoleModals.tsx
 'use client';
 
 import { useState } from 'react';
 import { OpenRole } from '@/data/mockData';
-import { X, CheckCircle2, ShieldCheck, AlertTriangle, Plus, Save } from 'lucide-react';
+import { X, CheckCircle2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface CreateRoleModalProps {

@@ -1,8 +1,7 @@
-// components/VisionSection.tsx
 'use client';
 
 import { motion } from 'framer-motion';
-import { Cpu, Server, CheckCircle2, ShieldCheck, Zap } from 'lucide-react';
+import { Cpu, Server, ShieldCheck, Zap } from 'lucide-react';
 
 const companies = [
   { name: 'STRIPE', role: 'Staff Infrastructure', fit: '96%', mcp: 'mcp.stripe.com/hiring' },
@@ -14,7 +13,6 @@ export default function VisionSection() {
   return (
     <section className="bg-black text-white py-28 px-6 border-b border-white/10 relative overflow-hidden">
       <div className="max-w-6xl mx-auto">
-        {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-20">
           <span className="font-mono text-xs tracking-widest text-primary uppercase block mb-3">
             // Network Topology
@@ -29,9 +27,7 @@ export default function VisionSection() {
           </p>
         </div>
 
-        {/* Network Diagram Graphic */}
         <div className="relative border border-white/15 bg-white/[0.02] p-8 md:p-12 font-mono">
-          {/* Top Node: Candidate & Agent */}
           <div className="flex flex-col items-center mb-12">
             <div className="px-6 py-2 border border-white/30 bg-black text-xs uppercase tracking-widest text-white/80 mb-3 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -44,14 +40,12 @@ export default function VisionSection() {
             <div className="h-10 w-px bg-gradient-to-b from-primary to-white/20 my-2" />
           </div>
 
-          {/* Protocol Bridge Label */}
           <div className="text-center mb-10">
             <span className="px-3 py-1 bg-white/10 text-white/70 text-[10px] uppercase tracking-widest border border-white/10">
               HIRING MCP PROTOCOL DIRECTORY
             </span>
           </div>
 
-          {/* Grid of Company MCPs */}
           <div className="grid md:grid-cols-3 gap-6 relative">
             {companies.map((comp, idx) => (
               <motion.div
@@ -83,7 +77,6 @@ export default function VisionSection() {
             ))}
           </div>
 
-          {/* Bottom Connection Status */}
           <div className="mt-12 pt-8 border-t border-white/10 flex flex-wrap items-center justify-between text-xs text-white/50 gap-4">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-primary" />

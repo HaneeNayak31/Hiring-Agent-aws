@@ -1,4 +1,3 @@
-// components/CompanyNav.tsx
 'use client';
 
 import Link from 'next/link';
@@ -14,9 +13,8 @@ import {
   Plus,
   Settings,
 } from 'lucide-react';
-import CommandPalette from '@/components/CommandPalette';
-import CreateRoleDrawer from '@/components/CreateRoleDrawer';
-import { mockRoles } from '@/data/mockData';
+import CommandPalette from '@/components/layout/CommandPalette';
+import CreateRoleDrawer from '@/components/company/CreateRoleDrawer';
 
 const companyLinks = [
   { href: '/company', label: 'OVERVIEW', icon: LayoutDashboard },
@@ -35,7 +33,6 @@ export default function CompanyNav() {
     <>
       <header className="bg-black text-white border-b border-white/15 px-6 py-3.5 sticky top-0 z-40 font-mono">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          {/* Branding */}
           <div className="flex items-center gap-6">
             <Link href="/" className="font-bold text-xl tracking-tighter flex items-center gap-2 group">
               <span className="px-2 py-0.5 bg-primary text-black font-mono text-xs font-bold">
@@ -47,7 +44,6 @@ export default function CompanyNav() {
             </Link>
           </div>
 
-          {/* 5 Core Navigation Destinations */}
           <nav className="hidden lg:flex items-center gap-1 text-xs">
             {companyLinks.map((link) => {
               const Icon = link.icon;
@@ -74,9 +70,7 @@ export default function CompanyNav() {
             })}
           </nav>
 
-          {/* Right Actions: Command Search, + Create Role, Settings, MCP Status */}
           <div className="flex items-center gap-3 text-xs">
-            {/* ⌘K Command Search trigger */}
             <button
               onClick={() => setIsSearchOpen(true)}
               className="hidden sm:flex items-center gap-2 bg-white/[0.04] border border-white/15 px-3 py-1.5 text-white/50 hover:border-white/40 transition"
@@ -86,7 +80,6 @@ export default function CompanyNav() {
               <kbd className="px-1.5 py-0.5 bg-white/10 text-[10px] text-white/70 font-mono">⌘K</kbd>
             </button>
 
-            {/* + Create Role Header Action */}
             <button
               onClick={() => setIsCreateDrawerOpen(true)}
               className="px-4 py-2 bg-primary text-black font-bold uppercase hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
@@ -95,7 +88,6 @@ export default function CompanyNav() {
               <span>+ CREATE ROLE</span>
             </button>
 
-            {/* Settings link icon */}
             <Link
               href="/company/settings"
               title="Company Settings"
@@ -104,7 +96,6 @@ export default function CompanyNav() {
               <Settings className="w-4 h-4" />
             </Link>
 
-            {/* MCP Online Status */}
             <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] uppercase font-bold tracking-widest">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>MCP ONLINE</span>
@@ -113,10 +104,8 @@ export default function CompanyNav() {
         </div>
       </header>
 
-      {/* Command Palette Modal */}
       <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 
-      {/* Create Role Drawer */}
       <CreateRoleDrawer
         isOpen={isCreateDrawerOpen}
         onClose={() => setIsCreateDrawerOpen(false)}

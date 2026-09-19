@@ -1,10 +1,8 @@
-// app/company/settings/page.tsx
 'use client';
 
-import CompanyNav from '@/components/CompanyNav';
-import Breadcrumbs from '@/components/Breadcrumbs';
-import { Settings, Server, ShieldCheck, Save } from 'lucide-react';
 import { useState } from 'react';
+import { Save } from 'lucide-react';
+import { CompanyNav, Breadcrumbs } from '@/components/layout';
 
 export default function CompanySettingsPage() {
   const [saved, setSaved] = useState(false);
@@ -21,7 +19,6 @@ export default function CompanySettingsPage() {
       <main className="max-w-5xl mx-auto px-6 py-10">
         <Breadcrumbs items={[{ label: 'SETTINGS' }]} />
 
-        {/* Header */}
         <div className="border-b border-white/15 pb-8 mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
           <div>
             <span className="text-xs text-primary uppercase tracking-widest block mb-2 font-bold">
@@ -41,9 +38,7 @@ export default function CompanySettingsPage() {
           </button>
         </div>
 
-        {/* SECTION 33: SETTINGS SECTIONS */}
         <div className="space-y-10 font-mono text-xs">
-          {/* Company Profile */}
           <div className="border border-white/15 bg-black p-8">
             <h2 className="font-bold text-base text-primary uppercase mb-6 pb-3 border-b border-white/10">
               // COMPANY PROFILE
@@ -68,7 +63,6 @@ export default function CompanySettingsPage() {
             </div>
           </div>
 
-          {/* MCP Configuration */}
           <div className="border border-white/15 bg-black p-8">
             <h2 className="font-bold text-base text-primary uppercase mb-6 pb-3 border-b border-white/10">
               // MCP PROTOCOL CONFIGURATION
@@ -91,7 +85,6 @@ export default function CompanySettingsPage() {
             </div>
           </div>
 
-          {/* Hiring Preferences */}
           <div className="border border-white/15 bg-black p-8">
             <h2 className="font-bold text-base text-primary uppercase mb-6 pb-3 border-b border-white/10">
               // VERIFICATION THRESHOLDS

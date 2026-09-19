@@ -1,49 +1,59 @@
-// app/company/roles/page.tsx
 'use client';
 
-import CompanyNav from '@/components/CompanyNav';
-import Breadcrumbs from '@/components/Breadcrumbs';
-import { mockRoles, OpenRole } from '@/data/mockData';
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import CompanyNav from '@/components/layout/CompanyNav';
+import Breadcrumbs from '@/components/layout/Breadcrumbs';
+import { OpenRole } from '@/data/mockData';
+import { fetchJobs, updateJobStatus, ApiError } from '@/data/apiClient';
+import { mapJobDetailToOpenRole } from '@/data/schemaAdapter';
+import ApiErrorBanner from '@/components/layout/ApiErrorBanner';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Plus, Search, ArrowRight, Pause, Play, Archive, Server, MoreVertical } from 'lucide-react';
-import CreateRoleDrawer from '@/components/CreateRoleDrawer';
-import { ArchiveRoleDialog } from '@/components/RoleModals';
+import { Plus, Search, Pause, Play, Archive, Server, AlertCircle } from 'lucide-react';
+import { ArchiveRoleDialog } from '@/components/company/RoleModals';
 import { motion } from 'framer-motion';
 
 export default function RolesPage() {
-  const searchParams = useSearchParams();
-  const [rolesList, setRolesList] = useState<OpenRole[]>(mockRoles);
+  const [rolesList, setRolesList] = useState<OpenRole[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<ApiError | string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [archiveTargetRole, setArchiveTargetRole] = useState<OpenRole | null>(null);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
 
-  useEffect(() => {
-    if (searchParams.get('action') === 'create') {
-      setIsCreateOpen(true);
+  const loadRoles = useCallback(async () => {
+    setLoading(true);
+    setApiError(null);
+    try {
+      const liveJobs = await fetchJobs();
+      if (liveJobs) {
+        const mapped = liveJobs.map(mapJobDetailToOpenRole);
+        setRolesList(mapped);
+      }
+    } catch (e: any) {
+      setApiError(e instanceof ApiError ? e : (e?.message || 'Failed to load roles from API'));
+    } finally {
+      setLoading(false);
     }
-  }, [searchParams]);
+  }, []);
 
-  const handleCreateRole = (newRolePartial: any) => {
-    const newRole: OpenRole = {
-      id: `role-${rolesList.length + 1}`,
-      ...newRolePartial,
-      activity: [
-        { timestamp: 'Just now', message: 'Role published to Hiring MCP protocol', type: 'EVENT' },
-      ],
-    };
-    setRolesList([newRole, ...rolesList]);
-  };
+  useEffect(() => {
+    loadRoles();
+  }, [loadRoles]);
 
-  const handleToggleStatus = (roleId: string) => {
+  const handleToggleStatus = async (roleId: string) => {
+    const target = rolesList.find((r) => r.id === roleId);
+    if (!target) return;
+    const previousStatus = target.status;
+    const newStatus = target.status === 'OPEN' ? 'PAUSED' : 'OPEN';
+    setActionError(null);
+
+    // Optimistically update
     setRolesList((prev) =>
       prev.map((r) => {
         if (r.id === roleId) {
-          const newStatus = r.status === 'OPEN' ? 'PAUSED' : 'OPEN';
           return {
             ...r,
             status: newStatus,
@@ -57,13 +67,34 @@ export default function RolesPage() {
         return r;
       })
     );
+
+    try {
+      await updateJobStatus(roleId, newStatus.toLowerCase());
+    } catch (e: any) {
+      // Revert optimistic update
+      setRolesList((prev) =>
+        prev.map((r) => (r.id === roleId ? { ...r, status: previousStatus, mcpExposed: previousStatus === 'OPEN' } : r))
+      );
+      setActionError(e instanceof ApiError ? e.message : (e?.message || 'Failed to update status on server'));
+    }
   };
 
-  const handleArchiveConfirm = () => {
+  const handleArchiveConfirm = async () => {
     if (!archiveTargetRole) return;
+    const roleId = archiveTargetRole.id;
+    const previousList = [...rolesList];
+    setActionError(null);
+
     setRolesList((prev) =>
-      prev.map((r) => (r.id === archiveTargetRole.id ? { ...r, status: 'ARCHIVED', mcpExposed: false } : r))
+      prev.map((r) => (r.id === roleId ? { ...r, status: 'ARCHIVED', mcpExposed: false } : r))
     );
+    try {
+      await updateJobStatus(roleId, 'archived');
+    } catch (e: any) {
+      // Revert
+      setRolesList(previousList);
+      setActionError(e instanceof ApiError ? e.message : (e?.message || 'Failed to archive role on server'));
+    }
   };
 
   const filteredRoles = rolesList.filter((role) => {
@@ -81,7 +112,6 @@ export default function RolesPage() {
       <main className="max-w-7xl mx-auto px-6 py-10">
         <Breadcrumbs items={[{ label: 'ROLES' }]} />
 
-        {/* Header */}
         <div className="border-b border-white/15 pb-8 mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
           <div>
             <span className="text-xs text-primary uppercase tracking-widest block mb-2 font-bold">
@@ -95,16 +125,15 @@ export default function RolesPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => setIsCreateOpen(true)}
-            className="px-8 py-4 bg-primary text-black font-mono text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] flex items-center gap-2"
+          <Link
+            href="/company/roles/create"
+            className="px-8 py-4 bg-primary text-black font-mono text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:translate-y-[-2px] flex items-center gap-2"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>+ CREATE ROLE</span>
-          </button>
+          </Link>
         </div>
 
-        {/* Filter & Search Bar */}
         <div className="flex flex-col sm:flex-row gap-4 mb-10 font-mono text-xs">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-white/40 absolute left-4 top-3.5" />
@@ -134,17 +163,45 @@ export default function RolesPage() {
           </div>
         </div>
 
-        {/* SECTION 7: EDITORIAL ROLE LIST */}
+        {actionError && (
+          <div className="mb-6 p-4 border border-red-500/40 bg-red-950/30 text-red-400 font-mono text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{actionError}</span>
+            </div>
+            <button
+              onClick={() => setActionError(null)}
+              className="text-white/60 hover:text-white underline text-[10px]"
+            >
+              DISMISS
+            </button>
+          </div>
+        )}
+
+        <ApiErrorBanner
+          error={apiError}
+          onRetry={loadRoles}
+          className="mb-6"
+        />
+
         <div className="space-y-4 font-mono">
-          {filteredRoles.length === 0 ? (
+          {loading ? (
+            <div className="border border-white/10 p-12 text-center font-mono animate-pulse">
+              <p className="text-primary text-xs tracking-widest uppercase">// SYNCHRONIZING REQUISITIONS REGISTRY...</p>
+            </div>
+          ) : filteredRoles.length === 0 ? (
             <div className="border border-dashed border-white/20 p-12 text-center font-mono">
-              <p className="text-white/50 mb-4">NO ROLES FOUND MATCHING FILTER</p>
-              <button
-                onClick={() => setIsCreateOpen(true)}
-                className="px-6 py-3 bg-primary text-black font-bold uppercase text-xs"
-              >
-                + Create New Role
-              </button>
+              <p className="text-white/50 mb-4">
+                {apiError ? 'UNABLE TO LOAD ROLES FROM BACKEND CLOUD' : 'NO ROLES FOUND MATCHING FILTER'}
+              </p>
+              {!apiError && (
+                <Link
+                  href="/company/roles/create"
+                  className="inline-block px-6 py-3 bg-primary text-black font-bold uppercase text-xs hover:bg-primary/90 transition"
+                >
+                  + Create New Role
+                </Link>
+              )}
             </div>
           ) : (
             filteredRoles.map((role, idx) => (
@@ -261,12 +318,6 @@ export default function RolesPage() {
           )}
         </div>
       </main>
-
-      <CreateRoleDrawer
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSave={handleCreateRole}
-      />
 
       <ArchiveRoleDialog
         role={archiveTargetRole}

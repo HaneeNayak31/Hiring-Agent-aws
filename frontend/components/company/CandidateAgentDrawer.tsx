@@ -1,13 +1,12 @@
-// components/CandidateAgentDrawer.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ExternalLink, Bot, FileText, CheckCircle2, ShieldCheck, ArrowRight, ArrowLeft, Play, RefreshCw } from 'lucide-react';
+import { X, Bot, FileText, CheckCircle2, ArrowLeft, Play, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import HRAgentThread from './assistant-ui/HRAgentThread';
-import ReportQuickView from './ReportQuickView';
-import { useAgentEvaluation } from './assistant-ui/useAgentEvaluation';
+import HRAgentThread from '@/components/assistant-ui/HRAgentThread';
+import ReportQuickView from '@/components/company/ReportQuickView';
+import { useAgentEvaluation } from '@/hooks/useAgentEvaluation';
 import { CandidateReport } from '@/data/mockData';
 
 interface CandidateAgentDrawerProps {
@@ -22,7 +21,7 @@ export default function CandidateAgentDrawer({
   onClose,
 }: CandidateAgentDrawerProps) {
   const [activeTab, setActiveTab] = useState<'CHAT' | 'REPORT'>('CHAT');
-  const { sessionState, isStreaming, error, startEvaluation, loadExistingReport } = useAgentEvaluation();
+  const { sessionState, isStreaming, startEvaluation, loadExistingReport } = useAgentEvaluation();
 
   const repoUrl =
     (candidate as any)?.repoUrl ||
@@ -32,27 +31,18 @@ export default function CandidateAgentDrawer({
     (candidate as any)?.agentSessionId ||
     'sess_0c4181ca24a096ec006aad2cc93e84819fa385826b6d6ce322';
 
-  // Load existing report or initialize live evaluation stream
   useEffect(() => {
     if (!isOpen || !candidate) return;
+    const currentCandidate = candidate;
 
-    let isMounted = true;
     async function init() {
-      const hasExisting = await loadExistingReport(sessionId, candidate.name, candidate.role);
-      // If no pre-existing report is found, auto-trigger live evaluation on candidate repo
-      if (!hasExisting && isMounted) {
-        startEvaluation(repoUrl);
-      }
+      await loadExistingReport(sessionId, currentCandidate.name, currentCandidate.role);
     }
 
     init();
 
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, candidate, sessionId, repoUrl, loadExistingReport, startEvaluation]);
+  }, [isOpen, candidate, sessionId, loadExistingReport]);
 
-  // ESC key listener to exit full screen
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -75,9 +65,7 @@ export default function CandidateAgentDrawer({
         transition={{ duration: 0.15, ease: 'easeOut' }}
         className="fixed inset-0 z-50 w-screen h-screen bg-black flex flex-col overflow-hidden font-sans text-xs"
       >
-        {/* Full-Screen Workspace Header */}
         <header className="px-6 py-3.5 border-b border-white/20 bg-black flex flex-wrap items-center justify-between gap-4 font-mono select-none shrink-0 shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
-          {/* Left: Back / Exit button + Identity */}
           <div className="flex items-center gap-5">
             <button
               type="button"
@@ -112,7 +100,6 @@ export default function CandidateAgentDrawer({
             </div>
           </div>
 
-          {/* Right: Metrics, Tabs, & Actions */}
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-3 border border-white/15 px-3 py-1.5 bg-white/[0.02]">
               <div className="text-right">
@@ -126,7 +113,6 @@ export default function CandidateAgentDrawer({
               </div>
             </div>
 
-            {/* View Selector Tabs: AUDIT CHAT & REPORT */}
             <div className="flex bg-white/5 border border-white/15 p-0.5 rounded-sharp">
               <button
                 type="button"
@@ -155,7 +141,6 @@ export default function CandidateAgentDrawer({
               </button>
             </div>
 
-            {/* Live Evaluate Button */}
             <button
               type="button"
               onClick={() => startEvaluation(repoUrl)}
@@ -194,7 +179,6 @@ export default function CandidateAgentDrawer({
           </div>
         </header>
 
-        {/* Main Full-Screen Body */}
         <div className="flex-1 overflow-hidden p-4 md:p-6 bg-black flex flex-col">
           {!sessionState ? (
             <div className="h-full flex flex-col items-center justify-center text-white/40 font-mono text-xs space-y-3">
@@ -229,7 +213,6 @@ export default function CandidateAgentDrawer({
           )}
         </div>
 
-        {/* Bottom Full-Screen Workspace Telemetry Status Bar */}
         <footer className="px-6 py-2.5 bg-black border-t border-white/15 flex flex-wrap items-center justify-between gap-3 font-mono text-[11px] select-none shrink-0">
           <div className="text-white/40 flex items-center gap-3">
             <span className="flex items-center gap-1.5 text-emerald-400 font-bold">

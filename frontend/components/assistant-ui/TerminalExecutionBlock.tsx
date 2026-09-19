@@ -1,8 +1,7 @@
-// components/assistant-ui/TerminalExecutionBlock.tsx
 'use client';
 
 import { useState } from 'react';
-import { Terminal, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { CommandExecutionItem } from './types';
 
 interface TerminalExecutionBlockProps {
@@ -20,14 +19,11 @@ export default function TerminalExecutionBlock({ item }: TerminalExecutionBlockP
   };
 
   const isSuccess = item.exitCode === 0;
-  const isFailed = item.exitCode !== null && item.exitCode !== undefined && item.exitCode !== 0;
 
   return (
     <div className="my-3 border border-white/20 bg-[#070707] rounded-sharp overflow-hidden shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-      {/* Terminal Header */}
       <div className="bg-white/[0.04] border-b border-white/10 px-3 py-2 flex items-center justify-between gap-3 font-mono text-[11px] select-none">
         <div className="flex items-center gap-2">
-          {/* Window dots */}
           <div className="flex items-center gap-1 mr-1">
             <span className="w-2.5 h-2.5 rounded-full bg-white/20" />
             <span className="w-2.5 h-2.5 rounded-full bg-white/20" />
@@ -39,7 +35,6 @@ export default function TerminalExecutionBlock({ item }: TerminalExecutionBlockP
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Exit code badge */}
           {item.exitCode !== undefined && item.exitCode !== null && (
             <span
               className={`px-1.5 py-0.5 text-[10px] font-bold uppercase rounded-sharp ${
@@ -52,7 +47,6 @@ export default function TerminalExecutionBlock({ item }: TerminalExecutionBlockP
             </span>
           )}
 
-          {/* Copy button */}
           <button
             type="button"
             onClick={handleCopy}
@@ -62,7 +56,6 @@ export default function TerminalExecutionBlock({ item }: TerminalExecutionBlockP
             {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
           </button>
 
-          {/* Collapse toggle */}
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
@@ -73,7 +66,6 @@ export default function TerminalExecutionBlock({ item }: TerminalExecutionBlockP
         </div>
       </div>
 
-      {/* Terminal Output */}
       {isExpanded && (
         <div className="p-3 font-mono text-[11px] text-white/80 leading-relaxed overflow-x-auto max-h-56 overflow-y-auto whitespace-pre selection:bg-primary selection:text-black">
           {item.output ? (

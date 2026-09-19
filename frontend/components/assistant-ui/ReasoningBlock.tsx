@@ -1,8 +1,7 @@
-// components/assistant-ui/ReasoningBlock.tsx
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Brain, Clock, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Brain } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ReasoningItem } from './types';
 
@@ -18,7 +17,6 @@ export default function ReasoningBlock({ item, defaultExpanded = false }: Reason
 
   return (
     <div className="my-2 border border-white/15 bg-black/60 rounded-sharp overflow-hidden transition-colors hover:border-white/30">
-      {/* Header / Trigger */}
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
@@ -57,7 +55,6 @@ export default function ReasoningBlock({ item, defaultExpanded = false }: Reason
         </div>
       </button>
 
-      {/* Expandable Body */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div

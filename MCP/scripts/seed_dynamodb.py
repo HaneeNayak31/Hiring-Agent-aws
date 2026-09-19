@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 ENDPOINT_URL = os.getenv("DYNAMODB_ENDPOINT_URL")  # Optional: http://localhost:8000 for local dev
 JOBS_TABLE_NAME = os.getenv("DYNAMODB_JOBS_TABLE", "HiringAgent_Jobs")
 APPS_TABLE_NAME = os.getenv("DYNAMODB_APPLICATIONS_TABLE", "HiringAgent_Applications")

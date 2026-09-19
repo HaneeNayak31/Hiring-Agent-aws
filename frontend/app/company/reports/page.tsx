@@ -1,20 +1,41 @@
-// app/company/reports/page.tsx
 'use client';
 
-import CompanyNav from '@/components/CompanyNav';
-import Breadcrumbs from '@/components/Breadcrumbs';
-import { mockCandidateReports } from '@/data/mockData';
-import { useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { FileBarChart2, ArrowRight, CheckCircle2, Search, Filter } from 'lucide-react';
-import CandidateDrawer from '@/components/CandidateDrawer';
+import { Search, Loader2 } from 'lucide-react';
+import { CompanyNav, Breadcrumbs } from '@/components/layout';
+import ApiErrorBanner from '@/components/layout/ApiErrorBanner';
+import { CandidateAgentDrawer } from '@/components/company';
+import { CandidateReport } from '@/data/mockData';
+import { fetchApplications, ApiError } from '@/data/apiClient';
+import { mapApplicationToCandidateReport } from '@/data/schemaAdapter';
 
 export default function ReportsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
+  const [reports, setReports] = useState<CandidateReport[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState<ApiError | string | null>(null);
 
-  const filteredReports = mockCandidateReports.filter((rep) => {
+  const loadReports = useCallback(async () => {
+    setIsLoading(true);
+    setApiError(null);
+    try {
+      const items = await fetchApplications();
+      setReports(items.map(mapApplicationToCandidateReport));
+    } catch (e: any) {
+      setApiError(e instanceof ApiError ? e : (e?.message || 'Failed to load intelligence reports'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadReports();
+  }, [loadReports]);
+
+  const filteredReports = reports.filter((rep) => {
     const matchesSearch =
       rep.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rep.role.toLowerCase().includes(searchTerm.toLowerCase());
@@ -28,7 +49,6 @@ export default function ReportsPage() {
       <main className="max-w-7xl mx-auto px-6 py-10">
         <Breadcrumbs items={[{ label: 'REPORTS' }]} />
 
-        {/* Header */}
         <div className="border-b border-white/15 pb-8 mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 font-mono">
           <div>
             <span className="text-xs text-primary uppercase tracking-widest block mb-2 font-bold">
@@ -47,7 +67,6 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Filter & Search */}
         <div className="flex flex-col sm:flex-row gap-4 mb-10 font-mono text-xs">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-white/40 absolute left-4 top-3.5" />
@@ -77,57 +96,90 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Data Table */}
-        <div className="border border-white/15 bg-black font-mono text-xs">
-          <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/15 bg-white/[0.03] text-white/40 font-bold uppercase text-[10px]">
-            <div className="col-span-4">CANDIDATE</div>
-            <div className="col-span-3">ROLE REQUISITION</div>
-            <div className="col-span-2">GENERATED</div>
-            <div className="col-span-1">COVERAGE</div>
-            <div className="col-span-2 text-right">ACTION</div>
-          </div>
+        <ApiErrorBanner
+          error={apiError}
+          onRetry={loadReports}
+          title="Intelligence Reports Synchronization Failed"
+          className="mb-8"
+        />
 
-          <div className="divide-y divide-white/10">
-            {filteredReports.map((report) => (
-              <div
-                key={report.id}
-                onClick={() => setSelectedReport(report)}
-                className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-white/[0.03] transition-colors cursor-pointer group"
-              >
-                <div className="col-span-4">
-                  <div className="font-bold text-sm text-white group-hover:text-primary transition-colors font-sans">
-                    {report.name}
+        {isLoading ? (
+          <div className="p-16 text-center font-mono flex flex-col items-center justify-center">
+            <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+            <span className="text-white/50 text-xs">Loading Candidate Intelligence Reports...</span>
+          </div>
+        ) : filteredReports.length === 0 ? (
+          <div className="border border-dashed border-white/20 p-12 text-center font-mono">
+            <div className="text-primary text-xs font-bold uppercase mb-2">
+              {apiError ? '// CLOUD REPOSITORY ERROR' : '// INTELLIGENCE REPOSITORY EMPTY'}
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">
+              {apiError ? 'FAILED TO RETRIEVE REPORTS' : 'NO CANDIDATE REPORTS GENERATED YET'}
+            </h3>
+            <p className="text-white/50 text-xs max-w-md mx-auto mb-6">
+              {apiError
+                ? 'Could not connect to the reports registry. Please ensure API Gateway is operational and retry.'
+                : 'When candidates submit code repositories, automated evaluations produce deep intelligence reports and evidence graphs which will be cataloged here.'}
+            </p>
+            <Link
+              href="/company/roles"
+              className="px-6 py-3 bg-white text-black font-bold text-xs uppercase hover:bg-primary transition inline-flex items-center gap-2"
+            >
+              View Roles & Postings
+            </Link>
+          </div>
+        ) : (
+          <div className="border border-white/15 bg-black font-mono text-xs">
+            <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/15 bg-white/[0.03] text-white/40 font-bold uppercase text-[10px]">
+              <div className="col-span-4">CANDIDATE</div>
+              <div className="col-span-3">ROLE REQUISITION</div>
+              <div className="col-span-2">GENERATED</div>
+              <div className="col-span-1">COVERAGE</div>
+              <div className="col-span-2 text-right">ACTION</div>
+            </div>
+
+            <div className="divide-y divide-white/10">
+              {filteredReports.map((report) => (
+                <div
+                  key={report.id}
+                  onClick={() => setSelectedReport(report)}
+                  className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-white/[0.03] transition-colors cursor-pointer group"
+                >
+                  <div className="col-span-4">
+                    <div className="font-bold text-sm text-white group-hover:text-primary transition-colors font-sans">
+                      {report.name}
+                    </div>
+                    <div className="text-[10px] text-white/40">REPORT ID: {report.id}</div>
                   </div>
-                  <div className="text-[10px] text-white/40">REPORT ID: {report.id}</div>
-                </div>
 
-                <div className="col-span-3 font-sans">
-                  <div className="font-bold text-white text-xs">{report.role}</div>
-                </div>
+                  <div className="col-span-3 font-sans">
+                    <div className="font-bold text-white text-xs">{report.role}</div>
+                  </div>
 
-                <div className="col-span-2 text-white/70">
-                  {report.appliedDate}
-                </div>
+                  <div className="col-span-2 text-white/70">
+                    {report.appliedDate}
+                  </div>
 
-                <div className="col-span-1 font-bold text-emerald-400">
-                  {report.evidenceCoverage}%
-                </div>
+                  <div className="col-span-1 font-bold text-emerald-400">
+                    {report.evidenceCoverage}%
+                  </div>
 
-                <div className="col-span-2 text-right">
-                  <Link
-                    href={`/company/candidates/${report.id}`}
-                    className="text-xs text-primary font-bold hover:underline inline-flex items-center gap-1"
-                  >
-                    VIEW REPORT →
-                  </Link>
+                  <div className="col-span-2 text-right">
+                    <Link
+                      href={`/company/candidates/${report.id}`}
+                      className="text-xs text-primary font-bold hover:underline inline-flex items-center gap-1"
+                    >
+                      VIEW REPORT →
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
-      <CandidateDrawer
+      <CandidateAgentDrawer
         candidate={selectedReport}
         isOpen={!!selectedReport}
         onClose={() => setSelectedReport(null)}

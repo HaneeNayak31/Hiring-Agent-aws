@@ -4,17 +4,48 @@ Encapsulates repository evaluation agent creation and configuration.
 """
 
 import uuid
+import json
+import os
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 from dotenv import load_dotenv
 from openai import OpenAI
+import boto3
 
 from prompts import INSTRUCTIONS, create_input
 from utils import load_plugins
 
 load_dotenv()
 
-client = OpenAI()
+
+def _load_openai_key_from_secret() -> None:
+    """Load the key only at runtime, after deployment, from Secrets Manager."""
+    if os.getenv("OPENAI_API_KEY"):
+        return
+    secret_arn = os.getenv("OPENAI_API_KEY_SECRET_ARN")
+    if not secret_arn:
+        return
+    secret = boto3.client("secretsmanager").get_secret_value(SecretId=secret_arn)
+    value = secret.get("SecretString", "")
+    parsed = json.loads(value) if value else {}
+    key = parsed.get("OPENAI_API_KEY", "")
+    if key:
+        os.environ["OPENAI_API_KEY"] = key
+
+
+client = None
+
+
+def _get_client() -> OpenAI:
+    global client
+    if client is None:
+        _load_openai_key_from_secret()
+        if not os.getenv("OPENAI_API_KEY"):
+            raise RuntimeError(
+                "OPENAI_API_KEY is not configured. Populate the configured Secrets Manager secret before evaluating candidates."
+            )
+        client = OpenAI()
+    return client
 
 REPORTS_DIR = Path(__file__).parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
@@ -37,7 +68,8 @@ def download_session_artifacts(
     downloaded_files: List[Path] = []
 
     try:
-        artifacts_page = client.beta.agents.sessions.artifacts.list(session_id=session_id)
+        api_client = _get_client()
+        artifacts_page = api_client.beta.agents.sessions.artifacts.list(session_id=session_id)
         for artifact in artifacts_page:
             if turn_id and getattr(artifact, "turn_id", None) != turn_id:
                 continue
@@ -50,7 +82,7 @@ def download_session_artifacts(
 
             dest_path = target_dir / filename
 
-            with client.beta.agents.sessions.artifacts.with_streaming_response.content(
+            with api_client.beta.agents.sessions.artifacts.with_streaming_response.content(
                 artifact.id, session_id=session_id
             ) as response:
                 response.stream_to_file(dest_path)
@@ -82,7 +114,7 @@ def create_agent_session(
     input_text = create_input(repo_url, instructions)
 
     # Strictly use OpenAI Agents API streaming session
-    stream = client.beta.agents.sessions.create(
+    stream = _get_client().beta.agents.sessions.create(
         agent={
             "model": "gpt-5.6-luna",
             "instructions": INSTRUCTIONS,

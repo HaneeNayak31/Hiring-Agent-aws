@@ -1,18 +1,17 @@
-// components/RecruiterNav.tsx
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Network, FileCheck2, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Briefcase, FileCheck, Activity, User } from 'lucide-react';
 
 const links = [
-  { href: '/recruiter', label: 'Overview', icon: Users },
-  { href: '/recruiter/candidates', label: 'Candidates', icon: Users },
-  { href: '/recruiter/candidates/cand-1', label: 'Evidence Workspace', icon: Network },
-  { href: '/recruiter/candidates/cand-1/brief', label: 'Interview Briefing', icon: FileCheck2 },
+  { href: '/candidate/opportunities', label: 'Opportunities', icon: Briefcase },
+  { href: '/candidate/applications', label: 'Applications', icon: FileCheck },
+  { href: '/candidate/activity', label: 'Agent Activity', icon: Activity },
+  { href: '/candidate/profile', label: 'Profile', icon: User },
 ];
 
-export default function RecruiterNav() {
+export default function CandidateNav() {
   const pathname = usePathname();
 
   return (
@@ -20,44 +19,41 @@ export default function RecruiterNav() {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-6">
           <Link href="/" className="font-bold text-xl tracking-tighter flex items-center gap-2 group">
-            <span className="px-2 py-0.5 bg-white text-black font-mono text-xs font-bold">
+            <span className="px-2 py-0.5 bg-primary text-black font-mono text-xs font-bold">
               AGENTIC
             </span>
-            <span className="font-mono text-xs text-primary font-bold">
-              // RECRUITER VERIFICATION
+            <span className="font-mono text-xs text-white/50 group-hover:text-white transition-colors">
+              // CANDIDATE
             </span>
           </Link>
         </div>
 
-        {/* Navigation Tabs */}
         <nav className="flex items-center gap-1 font-mono text-xs">
           {links.map((link) => {
             const Icon = link.icon;
-            const isActive = pathname === link.href || (link.href !== '/recruiter' && pathname?.startsWith(link.href));
+            const isActive = pathname === link.href || (link.href !== '/candidate' && pathname?.startsWith(link.href));
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 className={`px-4 py-2 border transition-all flex items-center gap-2 ${
                   isActive
-                    ? 'border-white text-white bg-white/10 font-bold'
+                    ? 'border-primary text-primary bg-primary/10 font-bold'
                     : 'border-transparent text-white/70 hover:text-white hover:border-white/20'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5 text-primary" />
+                <Icon className="w-3.5 h-3.5" />
                 <span>{link.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Switch to Candidate */}
         <Link
-          href="/candidate"
-          className="font-mono text-xs text-white/40 hover:text-white transition-colors flex items-center gap-1 border border-white/10 px-3 py-1.5"
+          href="/company"
+          className="font-mono text-xs text-white/60 hover:text-primary transition-colors flex items-center gap-1 border border-white/10 px-3 py-1.5"
         >
-          <ArrowLeft className="w-3 h-3" />
-          <span>Candidate View</span>
+          <span>Company Control Room →</span>
         </Link>
       </div>
     </header>

@@ -1,8 +1,8 @@
-// components/ReportQuickView.tsx
 'use client';
 
 import { useState } from 'react';
-import { Download, Printer, Copy, Check, FileText, ExternalLink, ShieldAlert, Sparkles, HelpCircle } from 'lucide-react';
+import { Download, Printer, Copy, Check, FileText } from 'lucide-react';
+import { API_BASE_URL } from '@/data/apiClient';
 
 interface ReportQuickViewProps {
   sessionId: string;
@@ -18,7 +18,7 @@ export default function ReportQuickView({
   roleTitle,
 }: ReportQuickViewProps) {
   const [copied, setCopied] = useState(false);
-  const downloadUrl = `http://127.0.0.1:8000/api/reports/${sessionId}`;
+  const downloadUrl = `${API_BASE_URL}/api/reports/${sessionId}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(markdownContent);
@@ -42,7 +42,6 @@ export default function ReportQuickView({
     { title: 'Hiring Recommendation', id: 'hiring-recommendation' },
   ];
 
-  // Helper to format headings and styled callouts from markdown
   const renderFormattedMarkdown = (content: string) => {
     if (!content) {
       return (
@@ -132,7 +131,6 @@ export default function ReportQuickView({
 
   return (
     <div className="flex flex-col h-full bg-black border border-white/15 text-white font-sans overflow-hidden">
-      {/* Top Toolbar */}
       <div className="p-3 bg-white/[0.02] border-b border-white/15 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-primary" />
@@ -143,7 +141,6 @@ export default function ReportQuickView({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Download Report Button */}
           <a
             href={downloadUrl}
             target="_blank"
@@ -155,7 +152,6 @@ export default function ReportQuickView({
             <span>DOWNLOAD .MD</span>
           </a>
 
-          {/* Copy Report */}
           <button
             type="button"
             onClick={handleCopy}
@@ -165,7 +161,6 @@ export default function ReportQuickView({
             <span>{copied ? 'COPIED' : 'COPY'}</span>
           </button>
 
-          {/* Print Brief */}
           <button
             type="button"
             onClick={handlePrint}
@@ -177,7 +172,6 @@ export default function ReportQuickView({
         </div>
       </div>
 
-      {/* Quick Jump TOC Pill Bar */}
       <div className="px-4 py-2 bg-black border-b border-white/10 flex items-center gap-2 overflow-x-auto no-scrollbar font-mono text-[10px]">
         <span className="text-white/40 uppercase shrink-0">JUMP:</span>
         {sections.map((sec, idx) => (
@@ -191,7 +185,6 @@ export default function ReportQuickView({
         ))}
       </div>
 
-      {/* Report Document Content */}
       <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-2 selection:bg-primary selection:text-black">
         {renderFormattedMarkdown(markdownContent)}
       </div>

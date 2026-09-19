@@ -1,66 +1,151 @@
-// app/company/candidates/[id]/page.tsx
 'use client';
 
-import CompanyNav from '@/components/CompanyNav';
-import Breadcrumbs from '@/components/Breadcrumbs';
-import { mockCandidateReports, VerifiedSkill } from '@/data/mockData';
-import { useState, useEffect } from 'react';
+import CompanyNav from '@/components/layout/CompanyNav';
+import Breadcrumbs from '@/components/layout/Breadcrumbs';
+import { fetchApplication, ApiError } from '@/data/apiClient';
+import { adaptApplicationToCandidate } from '@/data/schemaAdapter';
+import ApiErrorBanner from '@/components/layout/ApiErrorBanner';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import HRAgentThread from '@/components/assistant-ui/HRAgentThread';
-import ReportQuickView from '@/components/ReportQuickView';
-import { useAgentEvaluation } from '@/components/assistant-ui/useAgentEvaluation';
+import ReportQuickView from '@/components/company/ReportQuickView';
+import { useAgentEvaluation } from '@/hooks/useAgentEvaluation';
 import {
   ArrowLeft,
   CheckCircle2,
   AlertTriangle,
   ExternalLink,
   Network,
-  FileCheck2,
-  Terminal,
-  ShieldCheck,
-  Check,
   Circle,
   HelpCircle,
   Printer,
-  Share2,
-  Download,
   Bot,
-  Play,
-  RefreshCw,
+  Check,
+  Loader2,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 export default function CandidateDetailWorkspace() {
   const params = useParams();
-  const candId = params.id as string;
-  const cand = mockCandidateReports.find((c) => c.id === candId) || mockCandidateReports[0];
+  const candId = params?.id as string;
+  const [cand, setCand] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [apiError, setApiError] = useState<ApiError | string | null>(null);
 
   const [activeDossierTab, setActiveDossierTab] = useState<'AGENT_AUDIT' | 'EVIDENCE' | 'REPORT' | 'INTERVIEW_BRIEF'>('AGENT_AUDIT');
   const [selectedSkill, setSelectedSkill] = useState<string>('AWS');
-  const selectedSkillData = cand.skills.find((s) => s.name === selectedSkill) || cand.skills[0];
+
+  const loadCandidate = useCallback(async () => {
+    if (!candId) return;
+    setIsLoading(true);
+    setNotFound(false);
+    setApiError(null);
+    try {
+      const app = await fetchApplication(candId);
+      if (app) {
+        const adapted = adaptApplicationToCandidate(app);
+        setCand(adapted);
+        if (adapted.skills && adapted.skills.length > 0) {
+          setSelectedSkill(adapted.skills[0].name);
+        }
+      } else {
+        setNotFound(true);
+      }
+    } catch (e: any) {
+      if (e instanceof ApiError && e.isNotFound) {
+        setNotFound(true);
+      } else {
+        setApiError(e instanceof ApiError ? e : (e?.message || 'Failed to load application dossier'));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [candId]);
+
+  useEffect(() => {
+    loadCandidate();
+  }, [loadCandidate]);
 
   const { sessionState, isStreaming, error, startEvaluation, loadExistingReport } = useAgentEvaluation();
 
-  const repoUrl =
-    cand.repoUrl ||
-    'https://github.com/JainilPatel2502/NeuroBuilder-Frontend.git';
-
-  const sessionId = cand.agentSessionId || 'sess_0c4181ca24a096ec006aad2cc93e84819fa385826b6d6ce322';
+  const repoUrl = cand?.repoUrl || '';
+  const sessionId = cand?.agentSessionId || candId;
 
   useEffect(() => {
+    if (!cand) return;
     async function init() {
-      const hasExisting = await loadExistingReport(sessionId, cand.name, cand.role);
-      if (!hasExisting) {
-        startEvaluation(repoUrl);
-      }
+      await loadExistingReport(sessionId, cand.name, cand.role);
     }
     init();
-  }, [sessionId, cand.name, cand.role, repoUrl, loadExistingReport, startEvaluation]);
+  }, [sessionId, cand, loadExistingReport]);
 
   const handlePrint = () => {
     if (typeof window !== 'undefined') window.print();
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black text-white font-sans">
+        <CompanyNav />
+        <div className="max-w-7xl mx-auto px-6 py-24 flex flex-col items-center justify-center font-mono">
+          <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+          <p className="text-white/60 text-xs">Querying application dossier from live backend...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (apiError) {
+    return (
+      <div className="min-h-screen bg-black text-white font-sans">
+        <CompanyNav />
+        <main className="max-w-4xl mx-auto px-6 py-20 font-mono">
+          <ApiErrorBanner
+            error={apiError}
+            onRetry={loadCandidate}
+            title="Failed to Load Candidate Dossier"
+            className="mb-8"
+          />
+          <div className="text-center">
+            <Link
+              href="/company/candidates"
+              className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase transition inline-flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Return to Candidates
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (notFound || !cand) {
+    return (
+      <div className="min-h-screen bg-black text-white font-sans">
+        <CompanyNav />
+        <main className="max-w-4xl mx-auto px-6 py-20 font-mono text-center">
+          <div className="border border-white/20 p-12 bg-white/[0.02]">
+            <div className="text-primary text-xs font-bold uppercase mb-2">// 404 NOT FOUND</div>
+            <h2 className="text-2xl font-bold text-white mb-2">CANDIDATE DOSSIER NOT FOUND</h2>
+            <p className="text-white/50 text-xs mb-8">
+              No live application record matches ID <span className="text-primary font-bold">"{candId}"</span> in DynamoDB HiringAgent_Applications.
+            </p>
+            <Link
+              href="/company/candidates"
+              className="px-6 py-3 bg-white text-black font-bold text-xs uppercase hover:bg-primary transition inline-flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Return to Candidates
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const selectedSkillData = cand.skills?.find((s: any) => s.name === selectedSkill) || cand.skills?.[0];
 
   return (
     <div className="min-h-screen bg-black text-white font-sans print:bg-white print:text-black">
@@ -73,13 +158,13 @@ export default function CandidateDetailWorkspace() {
           <Breadcrumbs
             items={[
               { label: 'ROLES', href: '/company/roles' },
-              { label: cand.role, href: `/company/roles/${cand.roleId || 'role-1'}` },
+              { label: cand.role, href: `/company/roles/${cand.roleId || ''}` },
               { label: cand.name },
             ]}
           />
         </div>
 
-        {/* SECTION 16 & 19: CANDIDATE DOSSIER HEADER */}
+        {/* CANDIDATE DOSSIER HEADER */}
         <div className="border-b border-white/15 pb-8 mb-8 flex flex-col md:flex-row md:items-end justify-between gap-8 font-mono">
           <div>
             <div className="flex items-center gap-3 text-xs text-primary mb-2 font-bold">
@@ -178,6 +263,8 @@ export default function CandidateDetailWorkspace() {
                     roleTitle={cand.role}
                     repoUrl={repoUrl}
                     isStreaming={isStreaming}
+                    error={error}
+                    onRetry={() => startEvaluation(repoUrl, '')}
                     onRunEvaluation={(instructions) => startEvaluation(repoUrl, instructions)}
                     onOpenReport={() => setActiveDossierTab('REPORT')}
                   />
@@ -229,7 +316,7 @@ export default function CandidateDetailWorkspace() {
               </div>
             </div>
 
-            {/* SECTION 18 & 21: INTERACTIVE EVIDENCE GRAPH */}
+            {/* INTERACTIVE EVIDENCE GRAPH */}
             <div className="border-2 border-white bg-black p-8 relative shadow-[8px_8px_0px_0px_rgba(255,106,0,1)]">
               <div className="flex items-center justify-between pb-6 mb-8 border-b border-white/20">
                 <div className="flex items-center gap-3">
@@ -238,7 +325,7 @@ export default function CandidateDetailWorkspace() {
                     CLAIM → EVIDENCE → SOURCE TRACEABILITY MATRIX
                   </span>
                 </div>
-                <span className="text-xs text-white/40">{cand.skills.length} VERIFIED SIGNALS</span>
+                <span className="text-xs text-white/40">{(cand.skills || []).length} VERIFIED SIGNALS</span>
               </div>
 
               {/* Graph Structure */}
@@ -264,7 +351,7 @@ export default function CandidateDetailWorkspace() {
                 <div className="h-6 w-px bg-white/30 mb-8" />
 
                 <div className="flex flex-wrap justify-center gap-3">
-                  {cand.skills.map((sk) => {
+                  {(cand.skills || []).map((sk: any) => {
                     const isSelected = selectedSkill === sk.name;
                     return (
                       <button
@@ -300,22 +387,24 @@ export default function CandidateDetailWorkspace() {
                   </div>
 
                   <div className="space-y-3">
-                    {selectedSkillData.sources.map((src, idx) => (
+                    {(selectedSkillData.sources || []).map((src: any, idx: any) => (
                       <div key={idx} className="border border-white/10 bg-black p-4">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2 text-xs">
                             <span className="px-2 py-0.5 bg-primary/20 text-primary font-bold uppercase">{src.type}</span>
                             <span className="font-bold text-white font-sans">{src.title}</span>
                           </div>
-                          <a
-                            href={`https://${src.url}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-primary hover:underline flex items-center gap-1"
-                          >
-                            {src.url}
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
+                          {src.url && (
+                            <a
+                              href={src.url.startsWith('http') ? src.url : `https://${src.url}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-primary hover:underline flex items-center gap-1"
+                            >
+                              {src.url}
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
                         </div>
                         <p className="text-xs text-white/70 font-sans leading-relaxed">
                           &quot;{src.excerpt}&quot;
@@ -340,11 +429,11 @@ export default function CandidateDetailWorkspace() {
             <div>
               <span className="text-primary font-bold block mb-3 uppercase">// 02 VERIFIED SKILLS MATRIX</span>
               <div className="grid md:grid-cols-2 gap-4">
-                {cand.skills.map((sk, idx) => (
+                {(cand.skills || []).map((sk: any, idx: any) => (
                   <div key={idx} className="p-4 border border-white/10 bg-white/[0.02] flex justify-between items-center">
                     <div>
                       <div className="font-bold text-white text-sm font-sans">{sk.name}</div>
-                      <div className="text-[10px] text-white/40">{sk.sourcesCount} proving sources</div>
+                      <div className="text-[10px] text-white/40">{sk.sourcesCount || 0} proving sources</div>
                     </div>
                     <span className="text-emerald-400 font-bold text-xs">{sk.confidence}% VERIFIED</span>
                   </div>
@@ -355,7 +444,7 @@ export default function CandidateDetailWorkspace() {
             <div>
               <span className="text-amber-400 font-bold block mb-3 uppercase">// 03 POTENTIAL GAP AREAS</span>
               <div className="space-y-2 font-sans text-xs">
-                {cand.potentialGaps.map((gap, idx) => (
+                {(cand.potentialGaps || []).map((gap: any, idx: any) => (
                   <div key={idx} className="p-3 border border-amber-500/30 bg-amber-500/10 text-amber-200">
                     • {gap}
                   </div>
@@ -381,11 +470,13 @@ export default function CandidateDetailWorkspace() {
                 <span>CONFIRMED COMPETENCIES</span>
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
-                {cand.skills.filter(s => s.status === 'VERIFIED').map((sk, idx) => (
-                  <span key={idx} className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 font-bold">
-                    {sk.name} ✓
-                  </span>
-                ))}
+                {(cand.skills || [])
+                  .filter((s: any) => s.status === 'VERIFIED')
+                  .map((sk: any, idx: any) => (
+                    <span key={idx} className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 font-bold">
+                      {sk.name} ✓
+                    </span>
+                  ))}
               </div>
             </div>
 
@@ -395,7 +486,7 @@ export default function CandidateDetailWorkspace() {
                 <span>TARGETED INTERVIEW PROBE QUESTIONS</span>
               </div>
               <div className="space-y-4">
-                {cand.suggestedQuestions.map((q) => (
+                {(cand.suggestedQuestions || []).map((q: any) => (
                   <div key={q.number} className="border border-white/15 bg-white/[0.02] p-5">
                     <div className="flex items-center gap-3 font-bold text-sm text-white mb-2 font-sans">
                       <span className="px-2 py-0.5 bg-primary text-black font-mono text-xs">{q.number}</span>

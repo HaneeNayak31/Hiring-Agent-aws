@@ -1,15 +1,12 @@
-// components/CompanyControlRoomPreview.tsx
 'use client';
 
-import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ArrowUpRight, ShieldCheck, Cpu, Inbox, Users, FileCheck2, Server } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 
 export default function CompanyControlRoomPreview() {
   return (
     <section className="bg-black text-white py-28 px-6 border-b border-white/15 relative">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
           <div>
             <span className="font-mono text-xs text-primary uppercase tracking-widest block mb-3 font-bold">
@@ -31,9 +28,7 @@ export default function CompanyControlRoomPreview() {
           </Link>
         </div>
 
-        {/* Dashboard Frame Preview */}
         <div className="border-2 border-white/30 bg-black p-6 md:p-10 font-mono shadow-[12px_12px_0px_0px_rgba(255,106,0,1)]">
-          {/* Top Bar */}
           <div className="flex items-center justify-between pb-6 mb-8 border-b border-white/15">
             <div className="flex items-center gap-3">
               <span className="px-2 py-0.5 bg-primary text-black font-bold text-xs">COMPANY PLATFORM</span>
@@ -45,7 +40,6 @@ export default function CompanyControlRoomPreview() {
             </div>
           </div>
 
-          {/* Metric Bar */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8 text-xs">
             <div className="border border-white/15 p-4 bg-white/[0.02]">
               <span className="text-white/40 block text-[10px]">ACTIVE ROLES</span>
@@ -69,7 +63,6 @@ export default function CompanyControlRoomPreview() {
             </div>
           </div>
 
-          {/* Incoming Report Card Teaser */}
           <div className="border-2 border-white bg-white/[0.03] p-6 mb-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 pb-4 border-b border-white/10">
               <div>

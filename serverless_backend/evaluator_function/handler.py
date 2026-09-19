@@ -27,7 +27,7 @@ from agent import create_agent_session, download_session_artifacts, REPORTS_DIR
 from trace_collector import TraceCollector
 from s3_storage import upload_report, upload_trace
 
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 JOBS_TABLE_NAME = os.getenv("DYNAMODB_JOBS_TABLE", "HiringAgent_Jobs")
 APPS_TABLE_NAME = os.getenv("DYNAMODB_APPLICATIONS_TABLE", "HiringAgent_Applications")
 S3_BUCKET = os.getenv("S3_ASSESSMENT_BUCKET", "hiring-agent-assessments")
@@ -87,6 +87,18 @@ def update_application_status(
                     ":status": "EVALUATING",
                     ":now": now_iso,
                     ":sb_status": "RUNNING"
+                }
+            )
+        elif status == "FAILED":
+            table.update_item(
+                Key={"application_id": application_id},
+                UpdateExpression="SET #s = :status, evaluation_failed_at = :now, evaluation_error = :error, verification_pipeline.sandbox_status = :sb_status",
+                ExpressionAttributeNames={"#s": "status"},
+                ExpressionAttributeValues={
+                    ":status": "FAILED",
+                    ":now": now_iso,
+                    ":error": (summary or {}).get("error", "Evaluation failed"),
+                    ":sb_status": "FAILED"
                 }
             )
         elif status == "EVALUATED":
@@ -236,8 +248,23 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             repo_url = projects[0].get("repository_url") if projects else None
 
             if app_id and repo_url:
-                res = evaluate_candidate_application(application_id=app_id, repo_url=repo_url)
-                processed.append(res)
+                try:
+                    res = evaluate_candidate_application(application_id=app_id, repo_url=repo_url)
+                    processed.append(res)
+                except Exception as exc:
+                    update_application_status(app_id, "FAILED", summary={"error": str(exc)})
+                    processed.append({"status": "FAILED", "application_id": app_id, "error": str(exc)})
+            elif app_id:
+                update_application_status(
+                    app_id,
+                    "FAILED",
+                    summary={"error": "No valid repository URL was supplied."}
+                )
+                processed.append({
+                    "status": "FAILED",
+                    "application_id": app_id,
+                    "error": "No valid repository URL was supplied."
+                })
 
     return {
         "statusCode": 200,

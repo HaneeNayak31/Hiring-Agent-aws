@@ -13,7 +13,7 @@ confirm_changeset = true
 resolve_s3 = true
 stack_name = "hiring-agent-aws"
 s3_prefix = "hiring-agent-aws"
-region = "us-east-1"
+region = "ap-south-1"
 image_repositories = []
 
 [default.local_start_api.parameters]
