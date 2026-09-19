@@ -1,8 +1,18 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { AgentSessionState, ReasoningItem, CommandExecutionItem, AssistantMessageItem } from '@/components/assistant-ui/types';
-import { API_BASE_URL, fetchCandidateTrace } from '@/data/apiClient';
+import {
+  AgentSessionState,
+  AgentTranscript,
+  AgentWorkItem,
+  ReasoningItem,
+  CommandExecutionItem,
+  AssistantMessageItem,
+  MultiAgentCallItem,
+  AgentMessageItem,
+  SubagentInfo,
+} from '@/components/assistant-ui/types';
+import { API_BASE_URL, fetchCandidateTrace, fetchCandidateTranscript } from '@/data/apiClient';
 
 const BACKEND_BASE = API_BASE_URL;
 
@@ -17,14 +27,52 @@ export function useAgentEvaluation() {
   const loadExistingReport = useCallback(async (sessionId: string, candidateName: string, roleTitle: string) => {
     setTraceLoading(true);
     try {
-      const [reportResult, traceResult] = await Promise.allSettled([
+      const [reportResult, transcriptResult, traceResult] = await Promise.allSettled([
         fetch(`${BACKEND_BASE}/api/reports/${sessionId}`),
+        fetchCandidateTranscript(sessionId),
         fetchCandidateTrace(sessionId),
       ]);
+
       const response = reportResult.status === 'fulfilled' ? reportResult.value : null;
       const markdown = response?.ok ? await response.text() : '';
       if (traceResult.status === 'fulfilled') setTrace(traceResult.value);
-      if (!response?.ok && traceResult.status === 'rejected') return false;
+
+      const transcriptData: AgentTranscript | null =
+        transcriptResult.status === 'fulfilled' ? transcriptResult.value : null;
+
+      if (!response?.ok && !transcriptData && traceResult.status === 'rejected') {
+        return false;
+      }
+
+      const defaultItems: AgentWorkItem[] = [
+        {
+          id: 'msg-audit-complete',
+          type: 'message',
+          role: 'assistant',
+          content: markdown
+            ? `### Candidate Repository Inspection Record\n\nThe candidate evaluation dossier has been audited and compiled. Review the multi-agent execution timeline, terminal executions, and the published report.`
+            : `Repository evaluation pending for ${candidateName}. Click "Run inspection" to trigger live multi-agent analysis.`,
+          timestamp: new Date().toISOString(),
+        },
+      ];
+
+      const activeItems = transcriptData?.items && transcriptData.items.length > 0
+        ? transcriptData.items
+        : defaultItems;
+
+      const usageStats = transcriptData?.usage
+        ? {
+            inputTokens: transcriptData.usage.input_tokens || 0,
+            reasoningTokens: transcriptData.usage.reasoning_tokens || 0,
+            outputTokens: transcriptData.usage.output_tokens || 0,
+            totalTokens: transcriptData.usage.total_tokens || 0,
+          }
+        : {
+            inputTokens: 0,
+            reasoningTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+          };
 
       setSessionState({
         sessionId,
@@ -34,32 +82,20 @@ export function useAgentEvaluation() {
           status: 'ready',
           path: '/workspace',
         },
-        model: 'managed Agents API',
-        reasoningEffort: 'low',
+        model: transcriptData?.model || 'gpt-5.6-luna (OpenAI Responses API)',
+        reasoningEffort: 'medium',
         turns: [
           {
             id: 'turn-existing',
             turnNumber: 1,
             status: 'completed',
-            items: [
-              {
-                id: 'msg-audit-complete',
-                type: 'message',
-                role: 'assistant',
-                content: `### Candidate Repository Inspection Record\n\nThe Markdown inspection report is published and available in the **REPORT** tab.\n\nThe activity view is populated from the managed Agents API session when trace export is available.`,
-                timestamp: new Date().toISOString(),
-              },
-            ],
+            items: activeItems,
           },
         ],
-        usage: {
-          inputTokens: 0,
-          reasoningTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0,
-        },
+        usage: usageStats,
         reportMarkdown: markdown,
         reportDownloadUrl: `${BACKEND_BASE}/api/reports/${sessionId}`,
+        transcript: transcriptData,
       });
 
       return true;
@@ -84,30 +120,57 @@ export function useAgentEvaluation() {
 
     const initialSessionId = 'pending-session';
 
+    const initialAgents: SubagentInfo[] = [
+      {
+        id: 'coordinator',
+        name: 'Coordinator',
+        role: 'Lead Technical Evaluator',
+        status: 'in_progress',
+        color: 'amber',
+      },
+    ];
+
+    const initialTranscript: AgentTranscript = {
+      session_id: initialSessionId,
+      repo_url: repoUrl,
+      model: 'gpt-5.6-luna',
+      status: 'in_progress',
+      start_time: Date.now() / 1000,
+      usage: {
+        input_tokens: 0,
+        output_tokens: 0,
+        reasoning_tokens: 0,
+        total_tokens: 0,
+      },
+      agents: initialAgents,
+      items: [
+        {
+          id: 'sys-start',
+          type: 'message',
+          role: 'system',
+          agent: 'coordinator',
+          content: `Connecting to containerized sandbox at /workspace to evaluate candidate repository: ${repoUrl}`,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    };
+
     setSessionState({
       sessionId: initialSessionId,
       status: 'in_progress',
       environment: {
         id: 'env_docker_sandbox',
-          status: 'pending',
+        status: 'pending',
         path: '/workspace',
       },
-        model: 'managed Agents API',
-      reasoningEffort: 'low',
+      model: 'gpt-5.6-luna',
+      reasoningEffort: 'medium',
       turns: [
         {
           id: 'turn-1',
           turnNumber: 1,
           status: 'in_progress',
-          items: [
-            {
-              id: 'sys-start',
-              type: 'message',
-              role: 'system',
-              content: `Connecting to containerized sandbox at /workspace to evaluate candidate repository: ${repoUrl}`,
-              timestamp: new Date().toISOString(),
-            },
-          ],
+          items: initialTranscript.items,
         },
       ],
       usage: {
@@ -117,7 +180,10 @@ export function useAgentEvaluation() {
         totalTokens: 0,
       },
       reportMarkdown: '',
+      transcript: initialTranscript,
     });
+
+    let targetSessionId = initialSessionId;
 
     try {
       const response = await fetch(`${BACKEND_BASE}/api/agents/evaluate`, {
@@ -146,7 +212,7 @@ export function useAgentEvaluation() {
 
       let activeReasoningId: string | null = null;
       let activeAssistantMessageId: string | null = null;
-      let targetSessionId = initialSessionId;
+      const argBuffers: Record<string, string> = {};
 
       while (true) {
         const { done, value } = await reader.read();
@@ -169,19 +235,23 @@ export function useAgentEvaluation() {
           let eventData: any;
           try {
             eventData = JSON.parse(rawData);
-          } catch (e) {
+          } catch {
             continue;
           }
 
           const eventType = eventData.type || '';
 
-          if (eventType === 'agent.session.created') {
-            const sid = eventData.session_id || eventData.session?.id || targetSessionId;
+          // 1. Session created
+          if (eventType === 'agent.session.created' || eventType === 'response.created') {
+            const sid = eventData.session_id || eventData.session?.id || eventData.response?.id || targetSessionId;
             targetSessionId = sid;
-            const modelName = eventData.session?.model || 'managed Agents API';
+            const modelName = eventData.session?.model || eventData.response?.model || 'gpt-5.6-luna';
 
             setSessionState((prev) => {
               if (!prev) return prev;
+              const transcript = prev.transcript
+                ? { ...prev.transcript, session_id: sid, model: modelName }
+                : null;
               return {
                 ...prev,
                 sessionId: sid,
@@ -191,44 +261,70 @@ export function useAgentEvaluation() {
                   ...prev.environment,
                   status: 'connected',
                 },
+                transcript,
               };
             });
             setTraceLoading(true);
             fetchCandidateTrace(sid).then(setTrace).catch(() => undefined).finally(() => setTraceLoading(false));
-          } else if (eventType.includes('reasoning.delta') || (eventData.delta && eventType.includes('reasoning'))) {
+          }
+
+          // 2. Reasoning delta (matches OpenAI response.reasoning_text.delta, response.reasoning_summary_text.delta, agent.reasoning.delta)
+          else if (
+            (eventType.includes('reasoning') && (eventType.includes('delta') || eventData.delta !== undefined || eventData.text !== undefined)) ||
+            eventType === 'response.reasoning_text.delta' ||
+            eventType === 'response.reasoning_summary_text.delta'
+          ) {
             const deltaText = eventData.delta || eventData.text || '';
+            const agentId = eventData.agent || 'coordinator';
+
             setSessionState((prev) => {
               if (!prev) return prev;
               const turns = [...prev.turns];
               const currentTurn = { ...turns[turns.length - 1] };
               const items = [...currentTurn.items];
 
-              let rItemIndex = items.findIndex((i) => i.id === activeReasoningId && i.type === 'reasoning');
+              const rItemIndex = items.findIndex((i) => i.id === activeReasoningId && i.type === 'reasoning');
               if (rItemIndex === -1) {
                 const newId = `reasoning-${Date.now()}`;
                 activeReasoningId = newId;
                 const newRItem: ReasoningItem = {
                   id: newId,
+                  agent: agentId,
                   type: 'reasoning',
-                  title: 'Agent Reasoning & Environment Inspection',
+                  title: agentId === 'coordinator' ? 'Coordinator Strategic Reasoning' : `${agentId} Reasoning`,
                   summary: deltaText,
+                  content: deltaText,
                   status: 'in_progress',
                   timestamp: new Date().toISOString(),
                 };
                 items.push(newRItem);
               } else {
                 const existing = items[rItemIndex] as ReasoningItem;
+                const updatedContent = (existing.content || existing.summary || '') + deltaText;
                 items[rItemIndex] = {
                   ...existing,
-                  summary: (existing.summary || '') + deltaText,
+                  summary: updatedContent,
+                  content: updatedContent,
                 };
               }
 
               currentTurn.items = items;
               turns[turns.length - 1] = currentTurn;
-              return { ...prev, turns };
+
+              const transcript = prev.transcript
+                ? { ...prev.transcript, items }
+                : null;
+
+              return { ...prev, turns, transcript };
             });
-          } else if (eventType.includes('reasoning.completed')) {
+          }
+
+          // 3. Reasoning completed (matches OpenAI response.reasoning_text.done, agent.reasoning.completed)
+          else if (
+            (eventType.includes('reasoning') && (eventType.includes('done') || eventType.includes('completed'))) ||
+            eventType === 'response.reasoning_text.done' ||
+            eventType === 'response.reasoning_summary_text.done'
+          ) {
             setSessionState((prev) => {
               if (!prev) return prev;
               const turns = [...prev.turns];
@@ -241,59 +337,307 @@ export function useAgentEvaluation() {
               });
               currentTurn.items = items;
               turns[turns.length - 1] = currentTurn;
-              return { ...prev, turns };
+              const transcript = prev.transcript ? { ...prev.transcript, items } : null;
+              return { ...prev, turns, transcript };
             });
             activeReasoningId = null;
-          } else if (eventType.includes('command_execution') || eventType.includes('tool.execution') || eventData.command || eventData.item?.command) {
-            const item = eventData.item || eventData;
-            const cmd = item.command || eventData.command || 'npm test';
-            const out = item.output || eventData.output || '';
-            const exit = item.exit_code ?? eventData.exit_code ?? null;
+          }
 
-            setSessionState((prev) => {
-              if (!prev) return prev;
-              const turns = [...prev.turns];
-              const currentTurn = { ...turns[turns.length - 1] };
-              const items = [...currentTurn.items];
+          // 3.5 Streaming Function Call Arguments (Real OpenAI Responses API)
+          else if (eventType === 'response.function_call_arguments.delta') {
+            const callId = eventData.call_id || eventData.item_id;
+            const delta = eventData.delta || '';
+            if (callId && delta) {
+              argBuffers[callId] = (argBuffers[callId] || '') + delta;
+              const currentBuf = argBuffers[callId];
+              if (currentBuf.includes('"command"') || currentBuf.includes('"cmd"')) {
+                let parsed: any = null;
+                try {
+                  parsed = JSON.parse(currentBuf.endsWith('}') ? currentBuf : currentBuf + '"}');
+                } catch {
+                  // Buffer not yet valid JSON, wait for more chunks
+                }
+                if (parsed && (parsed.command || parsed.cmd)) {
+                  const cmdVal = parsed.command || parsed.cmd;
+                  const cmdStr = Array.isArray(cmdVal) ? cmdVal.join(' && ') : String(cmdVal);
+                  setSessionState((prev) => {
+                    if (!prev) return prev;
+                    const turns = [...prev.turns];
+                    const currentTurn = { ...turns[turns.length - 1] };
+                    const items = currentTurn.items.map((i) => {
+                      if (i.id === callId && (i.type === 'shell_call' || i.type === 'command_execution')) {
+                        return { ...i, command: cmdStr };
+                      }
+                      return i;
+                    });
+                    currentTurn.items = items;
+                    turns[turns.length - 1] = currentTurn;
+                    const transcript = prev.transcript ? { ...prev.transcript, items } : null;
+                    return { ...prev, turns, transcript };
+                  });
+                }
+              }
+            }
+          }
 
-              const cmdItem: CommandExecutionItem = {
-                id: `cmd-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-                type: 'command_execution',
-                command: cmd,
-                cwd: eventData.cwd || '/workspace',
-                output: out,
-                exitCode: exit,
-                status: exit !== null ? 'completed' : 'in_progress',
-                timestamp: new Date().toISOString(),
-              };
-              items.push(cmdItem);
+          // 4. Output Item Added: Shell Execution, Multi-Agent Call, or Function Call
+          else if (eventType === 'response.output_item.added') {
+            const item = eventData.item || {};
+            const itemType = item.type || '';
+            const toolName = (item.name || item.tool_name || item.server_label || itemType.replace('_call', '')).toLowerCase();
 
-              currentTurn.items = items;
-              turns[turns.length - 1] = currentTurn;
-              return { ...prev, turns };
-            });
-          } else if (eventType.includes('tool_call') || eventData.tool_name) {
-            setSessionState((prev) => {
-              if (!prev) return prev;
-              const turns = [...prev.turns];
-              const currentTurn = { ...turns[turns.length - 1] };
-              const items = [...currentTurn.items];
+            const isShell =
+              itemType === 'shell_call' ||
+              itemType === 'local_shell_call' ||
+              itemType === 'command_execution' ||
+              toolName === 'command_execution' ||
+              toolName === 'run_command' ||
+              toolName === 'shell' ||
+              toolName === 'bash' ||
+              toolName === 'terminal' ||
+              toolName === 'exec' ||
+              toolName.includes('command');
 
-              items.push({
-                id: `tool-${Date.now()}`,
-                type: 'tool_call',
-                toolName: eventData.tool_name || 'evaluator_tool',
-                input: eventData.input || {},
-                output: eventData.output,
-                status: 'completed',
-                timestamp: new Date().toISOString(),
+            const isMultiAgent =
+              itemType === 'multi_agent_call' ||
+              toolName === 'spawn_agent' ||
+              toolName === 'delegate' ||
+              toolName === 'transfer_to_agent' ||
+              toolName === 'call_subagent';
+
+            if (isMultiAgent) {
+              let parsedArgs: any = {};
+              try {
+                parsedArgs = typeof item.arguments === 'string' ? JSON.parse(item.arguments) : (item.arguments || {});
+              } catch {
+                parsedArgs = {};
+              }
+              const subagentId = parsedArgs.agent_name || parsedArgs.subagent || 'forensics-subagent';
+              const subagentName = subagentId
+                .replace(/-/g, ' ')
+                .replace(/\b\w/g, (l: string) => l.toUpperCase());
+
+              setSessionState((prev) => {
+                if (!prev) return prev;
+                const turns = [...prev.turns];
+                const currentTurn = { ...turns[turns.length - 1] };
+                const items = [...currentTurn.items];
+
+                const callItem: MultiAgentCallItem = {
+                  id: item.call_id || item.id || `ma-call-${Date.now()}`,
+                  agent: item.agent || 'coordinator',
+                  type: 'multi_agent_call',
+                  action: item.action || 'spawn_agent',
+                  target_agent: subagentId,
+                  target_agent_name: subagentName,
+                  instructions: parsedArgs.task || parsedArgs.instructions || 'Execute forensic inspection',
+                  status: 'completed',
+                  timestamp: new Date().toISOString(),
+                };
+                items.push(callItem);
+                currentTurn.items = items;
+                turns[turns.length - 1] = currentTurn;
+
+                // Also register subagent in agents list if not already present
+                const existingAgents = prev.transcript?.agents || [];
+                const agents = [...existingAgents];
+                if (!agents.some((a) => a.id === subagentId)) {
+                  agents.push({
+                    id: subagentId,
+                    name: subagentName,
+                    role: subagentId.includes('git')
+                      ? 'Git Forensics & Authorship Evaluator'
+                      : 'Architecture & Clean Code Rubric',
+                    parent_agent: item.agent || 'coordinator',
+                    status: 'completed',
+                    color: subagentId.includes('git') ? 'sky' : 'violet',
+                  });
+                }
+
+                const transcript = prev.transcript
+                  ? { ...prev.transcript, items, agents }
+                  : null;
+
+                return { ...prev, turns, transcript };
               });
+            } else if (isShell) {
+              const action = item.action || {};
+              let parsedArgs: any = {};
+              try {
+                parsedArgs = typeof item.arguments === 'string' ? JSON.parse(item.arguments) : (item.arguments || {});
+              } catch {
+                parsedArgs = {};
+              }
+              const cmds = action.commands || parsedArgs.command || parsedArgs.cmd || [item.command || 'run command'];
+              const cmdStr = Array.isArray(cmds) ? cmds.join(' && ') : String(cmds);
+              const cwd = action.working_directory || parsedArgs.cwd || parsedArgs.working_directory || '/workspace';
 
-              currentTurn.items = items;
-              turns[turns.length - 1] = currentTurn;
-              return { ...prev, turns };
-            });
-          } else if (eventType === 'agent.session.turn.output_text.delta' || (eventData.delta && !eventType.includes('reasoning'))) {
+              setSessionState((prev) => {
+                if (!prev) return prev;
+                const turns = [...prev.turns];
+                const currentTurn = { ...turns[turns.length - 1] };
+                const items = [...currentTurn.items];
+
+                const callId = item.call_id || item.id || `cmd-${Date.now()}`;
+                const shellItem: CommandExecutionItem = {
+                  id: callId,
+                  agent: item.agent || 'coordinator',
+                  type: 'shell_call',
+                  command: cmdStr,
+                  cwd,
+                  output: '',
+                  stdout: '',
+                  stderr: '',
+                  exitCode: null,
+                  status: 'in_progress',
+                  timestamp: new Date().toISOString(),
+                };
+                items.push(shellItem);
+                currentTurn.items = items;
+                turns[turns.length - 1] = currentTurn;
+
+                const transcript = prev.transcript ? { ...prev.transcript, items } : null;
+                return { ...prev, turns, transcript };
+              });
+            }
+          }
+
+          // 5. Output Item Done: Shell Output, Agent Message, Function Output, or Tool Output
+          else if (eventType === 'response.output_item.done') {
+            const item = eventData.item || {};
+            const itemType = item.type || '';
+            const callId = item.call_id || item.id || eventData.call_id;
+
+            // Finalize tool arguments once generation is complete
+            if (itemType === 'function_call' || itemType === 'tool_call') {
+              const fullRaw = item.arguments || argBuffers[callId] || '';
+              let parsed: any = {};
+              try {
+                parsed = typeof fullRaw === 'string' ? JSON.parse(fullRaw) : (fullRaw || {});
+              } catch {
+                parsed = {};
+              }
+              if (parsed.command || parsed.cmd) {
+                const cmdVal = parsed.command || parsed.cmd;
+                const cmdStr = Array.isArray(cmdVal) ? cmdVal.join(' && ') : String(cmdVal);
+                setSessionState((prev) => {
+                  if (!prev) return prev;
+                  const turns = [...prev.turns];
+                  const currentTurn = { ...turns[turns.length - 1] };
+                  const items = currentTurn.items.map((i) => {
+                    if (i.id === callId && (i.type === 'shell_call' || i.type === 'command_execution')) {
+                      return {
+                        ...i,
+                        command: cmdStr,
+                        cwd: parsed.cwd || parsed.working_directory || i.cwd,
+                      };
+                    }
+                    return i;
+                  });
+                  currentTurn.items = items;
+                  turns[turns.length - 1] = currentTurn;
+                  const transcript = prev.transcript ? { ...prev.transcript, items } : null;
+                  return { ...prev, turns, transcript };
+                });
+              }
+            }
+
+            // Tool Execution output from sandbox (function_call_output or shell_call_output)
+            else if (
+              itemType === 'shell_call_output' ||
+              itemType === 'function_call_output' ||
+              itemType === 'tool_call_output' ||
+              itemType.endsWith('_output')
+            ) {
+              const rawOut = item.output !== undefined ? item.output : eventData.output;
+              let parsedOut: any = rawOut;
+              if (typeof rawOut === 'string') {
+                try {
+                  parsedOut = JSON.parse(rawOut);
+                } catch {
+                  parsedOut = rawOut;
+                }
+              }
+
+              let stdout = '';
+              let stderr = '';
+              let exitCode = 0;
+
+              if (parsedOut && typeof parsedOut === 'object') {
+                if (Array.isArray(parsedOut) && parsedOut.length > 0) {
+                  const first = parsedOut[0];
+                  stdout = first.stdout || first.output || '';
+                  stderr = first.stderr || '';
+                  exitCode = first.outcome?.exit_code ?? 0;
+                } else {
+                  stdout = parsedOut.stdout || parsedOut.output || (typeof rawOut === 'string' ? rawOut : '');
+                  stderr = parsedOut.stderr || '';
+                  exitCode = parsedOut.exit_code ?? 0;
+                }
+              } else {
+                stdout = String(rawOut || '');
+              }
+
+              setSessionState((prev) => {
+                if (!prev) return prev;
+                const turns = [...prev.turns];
+                const currentTurn = { ...turns[turns.length - 1] };
+                const items = currentTurn.items.map((i) => {
+                  if (i.id === callId && (i.type === 'shell_call' || i.type === 'command_execution')) {
+                    return {
+                      ...i,
+                      stdout,
+                      stderr,
+                      output: stdout + (stderr ? `\nSTDERR:\n${stderr}` : ''),
+                      exitCode,
+                      exit_code: exitCode,
+                      status: (exitCode === 0 ? 'completed' : 'failed') as any,
+                    };
+                  }
+                  return i;
+                });
+                currentTurn.items = items;
+                turns[turns.length - 1] = currentTurn;
+                const transcript = prev.transcript ? { ...prev.transcript, items } : null;
+                return { ...prev, turns, transcript };
+              });
+            } else if (itemType === 'agent_message') {
+              setSessionState((prev) => {
+                if (!prev) return prev;
+                const turns = [...prev.turns];
+                const currentTurn = { ...turns[turns.length - 1] };
+                const items = [...currentTurn.items];
+
+                const agentMsg: AgentMessageItem = {
+                  id: `agent-msg-${Date.now()}`,
+                  agent: item.author || 'subagent',
+                  author: item.author || 'subagent',
+                  author_name: (item.author || 'Subagent')
+                    .replace(/-/g, ' ')
+                    .replace(/\b\w/g, (l: string) => l.toUpperCase()),
+                  recipient: item.recipient || 'coordinator',
+                  recipient_name: (item.recipient || 'Coordinator')
+                    .replace(/-/g, ' ')
+                    .replace(/\b\w/g, (l: string) => l.toUpperCase()),
+                  type: 'agent_message',
+                  content: item.content || '',
+                  timestamp: new Date().toISOString(),
+                };
+                items.push(agentMsg);
+                currentTurn.items = items;
+                turns[turns.length - 1] = currentTurn;
+                const transcript = prev.transcript ? { ...prev.transcript, items } : null;
+                return { ...prev, turns, transcript };
+              });
+            }
+          }
+
+          // 6. Assistant text delta (Coordinator final summary)
+          else if (
+            eventType === 'response.output_text.delta' ||
+            eventType === 'agent.session.turn.output_text.delta' ||
+            (eventData.delta && !eventType.includes('reasoning'))
+          ) {
             const deltaText = eventData.delta || '';
             setSessionState((prev) => {
               if (!prev) return prev;
@@ -301,12 +645,13 @@ export function useAgentEvaluation() {
               const currentTurn = { ...turns[turns.length - 1] };
               const items = [...currentTurn.items];
 
-              let msgIndex = items.findIndex((i) => i.id === activeAssistantMessageId && i.type === 'message');
+              const msgIndex = items.findIndex((i) => i.id === activeAssistantMessageId && i.type === 'message');
               if (msgIndex === -1) {
                 const newId = `assistant-msg-${Date.now()}`;
                 activeAssistantMessageId = newId;
                 const newMsg: AssistantMessageItem = {
                   id: newId,
+                  agent: eventData.agent || 'coordinator',
                   type: 'message',
                   role: 'assistant',
                   content: deltaText,
@@ -323,10 +668,18 @@ export function useAgentEvaluation() {
 
               currentTurn.items = items;
               turns[turns.length - 1] = currentTurn;
-              return { ...prev, turns };
+              const transcript = prev.transcript ? { ...prev.transcript, items } : null;
+              return { ...prev, turns, transcript };
             });
-          } else if (eventType === 'agent.session.turn.completed') {
-            const usage = eventData.turn?.usage || {};
+          }
+
+          // 7. Usage & Turn Completion
+          else if (eventType === 'response.done' || eventType === 'agent.session.turn.completed') {
+            const resp = eventData.response || {};
+            const usage = resp.usage || eventData.turn?.usage || {};
+            const outputDetails = usage.output_tokens_details || {};
+            const rTokens = outputDetails.reasoning_tokens || 0;
+
             setSessionState((prev) => {
               if (!prev) return prev;
               const turns = [...prev.turns];
@@ -334,20 +687,39 @@ export function useAgentEvaluation() {
               currentTurn.status = 'completed';
               turns[turns.length - 1] = currentTurn;
 
+              const usageUpdate = {
+                inputTokens: usage.input_tokens || prev.usage.inputTokens,
+                reasoningTokens: rTokens || prev.usage.reasoningTokens,
+                outputTokens: usage.output_tokens || prev.usage.outputTokens,
+                totalTokens: usage.total_tokens || prev.usage.totalTokens,
+              };
+
+              const transcript = prev.transcript
+                ? {
+                    ...prev.transcript,
+                    status: 'completed',
+                    usage: {
+                      input_tokens: usageUpdate.inputTokens,
+                      output_tokens: usageUpdate.outputTokens,
+                      reasoning_tokens: usageUpdate.reasoningTokens,
+                      total_tokens: usageUpdate.totalTokens,
+                    },
+                  }
+                : null;
+
               return {
                 ...prev,
                 status: 'idle',
                 turns,
-                usage: {
-                  inputTokens: usage.input_tokens || prev.usage.inputTokens,
-                  reasoningTokens: usage.reasoning_tokens || prev.usage.reasoningTokens,
-                  outputTokens: usage.output_tokens || prev.usage.outputTokens,
-                  totalTokens: usage.total_tokens || prev.usage.totalTokens,
-                },
+                usage: usageUpdate,
+                transcript,
               };
             });
             activeAssistantMessageId = null;
-          } else if (eventType === 'agent.artifact.ready') {
+          }
+
+          // 8. Artifact Ready
+          else if (eventType === 'agent.artifact.ready') {
             const sid = eventData.session_id || targetSessionId;
             const downloadUrl = `${BACKEND_BASE}${eventData.download_url || `/api/reports/${sid}`}`;
             setTraceLoading(true);
@@ -379,7 +751,10 @@ export function useAgentEvaluation() {
                 })
                 .catch((e) => console.warn('Failed to fetch artifact markdown:', e));
             }
-          } else if (eventType === 'error') {
+          }
+
+          // 9. Error
+          else if (eventType === 'error') {
             const errMsg = eventData.error?.message || 'Server-side evaluation error';
             setError(errMsg);
             setSessionState((prev) => {
@@ -405,6 +780,29 @@ export function useAgentEvaluation() {
           status: 'idle',
         };
       });
+
+      // Fetch official completed transcript from backend if available
+      if (targetSessionId && targetSessionId !== initialSessionId) {
+        fetchCandidateTranscript(targetSessionId).then((fullTranscript) => {
+          if (fullTranscript) {
+            setSessionState((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                transcript: fullTranscript,
+                turns: [
+                  {
+                    id: 'turn-final',
+                    turnNumber: 1,
+                    status: 'completed',
+                    items: fullTranscript.items || prev.turns[0]?.items || [],
+                  },
+                ],
+              };
+            });
+          }
+        }).catch(() => undefined);
+      }
     }
   }, []);
 

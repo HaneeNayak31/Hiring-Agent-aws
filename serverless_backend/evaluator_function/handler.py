@@ -27,6 +27,7 @@ from agent import create_agent_session, download_session_artifacts, REPORTS_DIR
 from otlp_traces import export_session_traces
 from s3_storage import upload_report, upload_trace
 from stream_to_otlp import StreamToOtlpSynthesizer
+from stream_recorder import StreamRecorder
 
 AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 JOBS_TABLE_NAME = os.getenv("DYNAMODB_JOBS_TABLE", "HiringAgent_Jobs")
@@ -186,6 +187,13 @@ def evaluate_candidate_application(
         instructions=instructions,
     )
 
+    recorder = StreamRecorder(
+        session_id=session_uuid,
+        application_id=application_id,
+        repo_url=first_repo_url,
+        instructions=instructions,
+    )
+
     app_reports_dir = REPORTS_DIR / application_id
     app_reports_dir.mkdir(parents=True, exist_ok=True)
     managed_session_id = session_uuid
@@ -193,6 +201,7 @@ def evaluate_candidate_application(
 
     with stream:
         for event in stream:
+            recorder.process_event(event)
             event_data = synthesizer.process_event(event)
             if not isinstance(event_data, dict):
                 continue
@@ -228,6 +237,20 @@ def evaluate_candidate_application(
     report_markdown = report_file.read_text(encoding="utf-8")
     report_s3_url = upload_report(application_id, report_markdown)
 
+    # 1. Primary Rich Multi-Agent Transcript
+    transcript_s3_url = ""
+    try:
+        transcript_doc = recorder.finish()
+        transcript_s3_url = upload_trace(application_id, transcript_doc, filename="session_transcript.json")
+        print(f"[Evaluator] Successfully recorded and uploaded rich multi-agent transcript: {transcript_s3_url}", flush=True)
+
+        # Upload raw stream events audit log
+        raw_events_doc = {"session_id": managed_session_id, "events": recorder.get_raw_events()}
+        upload_trace(application_id, raw_events_doc, filename="session_events.json")
+    except Exception as transcript_err:
+        print(f"[Evaluator] Stream transcript recording warning: {transcript_err}", flush=True)
+
+    # 2. Secondary OTLP Trace (for telemetry backward compatibility)
     trace_s3_url = ""
     trace_status = "UNAVAILABLE"
     try:
@@ -235,10 +258,6 @@ def evaluate_candidate_application(
         trace_s3_url = upload_trace(application_id, trace_doc, filename="session_trace.otlp.json")
         trace_status = "EXPORTED"
         print(f"[Evaluator] Successfully synthesized and uploaded OTLP trace from real-time stream: {trace_s3_url}", flush=True)
-
-        # Upload raw stream events audit log
-        raw_events_doc = {"session_id": managed_session_id, "events": synthesizer.get_raw_events()}
-        upload_trace(application_id, raw_events_doc, filename="session_events.json")
     except Exception as exc:
         print(f"[Evaluator] Stream OTLP synthesis failed, trying fallback: {exc}", flush=True)
         try:
@@ -252,6 +271,7 @@ def evaluate_candidate_application(
         "session_id": managed_session_id,
         "repositories_total": len(repositories),
         "repositories": repositories,
+        "transcript_s3_url": transcript_s3_url,
         "trace_status": trace_status,
         "completed_at": datetime.now(timezone.utc).isoformat(),
     }

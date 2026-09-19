@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import {
   AlertCircle,
+  ArrowLeft,
   Bot,
   Check,
   ChevronDown,
@@ -23,6 +24,7 @@ import {
 import { AgentSessionState } from './types';
 import { normalizeTrace } from './traceAdapter';
 import { NormalizedTrace, TraceAttributeValue, TraceSpan, TraceSpanKind } from './traceTypes';
+import AgentTranscriptView from './AgentTranscriptView';
 
 interface HRAgentThreadProps {
   session: AgentSessionState;
@@ -287,6 +289,9 @@ export default function HRAgentThread({
   onRunEvaluation,
   onOpenReport,
 }: HRAgentThreadProps) {
+  // Primary view mode: 'timeline' (Codex/Claude Desktop view) or 'trace' (raw OTLP APM spans)
+  const [viewMode, setViewMode] = useState<'timeline' | 'trace'>('timeline');
+
   const normalized = useMemo<NormalizedTrace>(() => normalizeTrace(trace as any), [trace]);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
@@ -321,15 +326,62 @@ export default function HRAgentThread({
     ['Output tokens', number(normalized.summary.outputTokens)],
   ];
 
+  // If in timeline view (Default), render the rich Codex/Claude Desktop AgentTranscriptView!
+  if (viewMode === 'timeline') {
+    return (
+      <div className="relative flex h-full flex-col overflow-hidden">
+        {/* Top switcher strip if OTLP spans are available */}
+        {normalized.spans.length > 0 && (
+          <div className="flex items-center justify-between border-b border-white/10 bg-[#0c0c0e] px-4 py-1 text-[11px]">
+            <span className="text-white/40 font-mono text-[10px]">
+              Viewing Multi-Agent Execution Console
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewMode('trace')}
+              className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-white transition font-mono"
+            >
+              <Layers3 className="h-3 w-3" /> Switch to Raw OTLP Spans ({normalized.spans.length}) →
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1 min-h-0">
+          <AgentTranscriptView
+            session={session}
+            candidateName={candidateName}
+            roleTitle={roleTitle}
+            repoUrl={repoUrl}
+            isStreaming={isStreaming}
+            error={error}
+            onRetry={onRetry}
+            onRunEvaluation={onRunEvaluation}
+            onOpenReport={onOpenReport}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Secondary view: Raw OTLP Trace viewer
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-sharp border border-white/15 bg-black text-white shadow-2xl shadow-black/40">
       <div className="shrink-0 border-b border-white/15 bg-white/[0.02] px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-              <Layers3 className="h-3.5 w-3.5" /> Execution trace
+            <div className="mb-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setViewMode('timeline')}
+                className="inline-flex items-center gap-1.5 rounded border border-white/20 bg-white/5 px-2 py-0.5 font-mono text-[10px] text-white/80 hover:border-white hover:text-white transition"
+              >
+                <ArrowLeft className="h-3 w-3" /> Multi-Agent Console
+              </button>
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+                <Layers3 className="h-3.5 w-3.5" /> Raw OTLP Trace
+              </div>
             </div>
-            <h2 className="truncate text-lg font-semibold tracking-tight">Repository inspection activity</h2>
+            <h2 className="truncate text-lg font-semibold tracking-tight">Repository inspection spans</h2>
             <p className="mt-1 truncate text-xs text-white/45">
               {candidateName} · {roleTitle}
               {repoUrl ? ` · ${repoUrl}` : ''}
@@ -437,11 +489,17 @@ export default function HRAgentThread({
             ) : (
               <div className="flex h-full min-h-48 flex-col items-center justify-center px-8 text-center">
                 <Command className="h-7 w-7 text-white/20" />
-                <p className="mt-3 text-sm text-white/60">No recorded spans yet</p>
+                <p className="mt-3 text-sm text-white/60">No recorded OTLP spans yet</p>
                 <p className="mt-1 max-w-sm text-xs leading-5 text-white/35">
-                  The trace appears after the managed Agents API turn finishes. Large inputs, outputs, and tool results stay
-                  hidden until you inspect a span.
+                  The primary agent activity is displayed on the Multi-Agent Console.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('timeline')}
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-sharp border border-white/20 bg-white/5 px-3 py-1.5 text-xs text-white hover:border-white transition"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" /> Return to Multi-Agent Console
+                </button>
               </div>
             )}
           </div>

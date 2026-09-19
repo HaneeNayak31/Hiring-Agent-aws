@@ -269,6 +269,17 @@ export async function fetchCandidateTrace(identifier: string): Promise<any> {
   }
 }
 
+export async function fetchCandidateTranscript(identifier: string): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/transcripts/${identifier}`, { cache: 'no-store' });
+    return await parseResponseOrThrow<any>(res, `Execution transcript for '${identifier}' not available`);
+  } catch (err: any) {
+    // If not found or error, return null so client-side fallback can synthesize smoothly
+    return null;
+  }
+}
+
+
 export async function submitApplication(payload: {
   job_id: string;
   candidate_passport: Record<string, any>;
