@@ -183,6 +183,11 @@ Resources:
             TableName: !Ref JobsTable
         - S3ReadPolicy:
             BucketName: !Ref AssessmentsBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref OpenAIApiSecret
       Events:
         ApiProxy:
           Type: HttpApi

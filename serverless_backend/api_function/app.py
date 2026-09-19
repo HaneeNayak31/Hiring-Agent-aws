@@ -27,6 +27,7 @@ JOBS_TABLE_NAME = os.getenv("DYNAMODB_JOBS_TABLE", "HiringAgent_Jobs")
 APPS_TABLE_NAME = os.getenv("DYNAMODB_APPLICATIONS_TABLE", "HiringAgent_Applications")
 S3_BUCKET = os.getenv("S3_ASSESSMENT_BUCKET", "hiring-agent-assessments")
 ENDPOINT_URL = os.getenv("DYNAMODB_ENDPOINT_URL")
+OPENAI_SECRET_ARN = os.getenv("OPENAI_API_KEY_SECRET_ARN")
 
 LOCAL_REPORTS_DIR = Path(__file__).resolve().parent.parent / "evaluator_function" / "reports"
 
@@ -58,6 +59,37 @@ def _get_s3_client():
     if s3_endpoint:
         kwargs["endpoint_url"] = s3_endpoint
     return boto3.client("s3", **kwargs)
+
+
+def _get_openai_api_key() -> Optional[str]:
+    """
+    Checks for OPENAI_API_KEY in environment or AWS Secrets Manager.
+    Returns the stripped key if found and non-empty, otherwise None.
+    """
+    env_key = os.getenv("OPENAI_API_KEY")
+    if env_key and env_key.strip():
+        return env_key.strip()
+
+    if not OPENAI_SECRET_ARN:
+        return None
+
+    try:
+        sm_client = boto3.client("secretsmanager", region_name=AWS_REGION)
+        secret_res = sm_client.get_secret_value(SecretId=OPENAI_SECRET_ARN)
+        secret_str = secret_res.get("SecretString", "")
+        if secret_str:
+            try:
+                parsed = json.loads(secret_str)
+                key = parsed.get("OPENAI_API_KEY", "")
+                if key and key.strip():
+                    return key.strip()
+            except json.JSONDecodeError:
+                if secret_str.strip():
+                    return secret_str.strip()
+    except Exception as exc:
+        print(f"[API] Error reading OpenAI API key secret ({OPENAI_SECRET_ARN}): {exc}", flush=True)
+
+    return None
 
 
 def _decimal_to_native(obj: Any) -> Any:
@@ -114,6 +146,7 @@ IN_MEMORY_APPLICATIONS: Dict[str, Dict[str, Any]] = {}
 
 @app.get("/api/health")
 def health():
+    openai_configured = bool(_get_openai_api_key())
     return {
         "status": "ok",
         "service": "Serverless_Recruiter_API",
@@ -122,7 +155,8 @@ def health():
             "jobs": JOBS_TABLE_NAME,
             "applications": APPS_TABLE_NAME
         },
-        "s3_bucket": S3_BUCKET
+        "s3_bucket": S3_BUCKET,
+        "openai_configured": openai_configured
     }
 
 
@@ -577,7 +611,22 @@ async def evaluate_agent_stream(payload: Dict[str, Any] = Body(...)):
     SSE streaming endpoint powering the interactive Recruiter Terminal in the UI.
     Streams session creation, reasoning thoughts, terminal command executions,
     and report generation events.
+    Verifies that OPENAI_API_KEY is configured before running live evaluations.
     """
+    api_key = _get_openai_api_key()
+    if not api_key:
+        async def error_generator():
+            error_payload = {
+                "type": "error",
+                "error": {
+                    "code": "OPENAI_API_KEY_NOT_CONFIGURED",
+                    "message": "OPENAI_API_KEY is not configured. Populate the OpenAI API Key in AWS Secrets Manager (secret: OpenAIApiSecret) or environment before running live agent evaluations."
+                }
+            }
+            yield f"data: {json.dumps(error_payload)}\n\n"
+
+        return StreamingResponse(error_generator(), media_type="text/event-stream")
+
     repo_url = payload.get("repo_url", "https://github.com/candidate/repo.git")
     instructions = payload.get("instructions", "Audit test coverage and security")
     session_id = f"sess_{uuid.uuid4().hex[:12]}"
