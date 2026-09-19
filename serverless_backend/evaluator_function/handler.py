@@ -26,6 +26,7 @@ load_dotenv()
 from agent import create_agent_session, download_session_artifacts, REPORTS_DIR
 from otlp_traces import export_session_traces
 from s3_storage import upload_report, upload_trace
+from stream_to_otlp import StreamToOtlpSynthesizer
 
 AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 JOBS_TABLE_NAME = os.getenv("DYNAMODB_JOBS_TABLE", "HiringAgent_Jobs")
@@ -171,26 +172,33 @@ def evaluate_candidate_application(
     update_application_status(application_id, "EVALUATING")
 
     first_repo_url = repositories[0]["repository_url"]
-    stream, _ = create_agent_session(
+    stream, session_uuid = create_agent_session(
         repo_url=first_repo_url,
         instructions=instructions,
         repositories=repositories,
         job_context=job_context,
     )
 
+    synthesizer = StreamToOtlpSynthesizer(
+        session_id=session_uuid,
+        application_id=application_id,
+        repo_url=first_repo_url,
+        instructions=instructions,
+    )
+
     app_reports_dir = REPORTS_DIR / application_id
     app_reports_dir.mkdir(parents=True, exist_ok=True)
-    managed_session_id = None
+    managed_session_id = session_uuid
     completed_turn_id = None
 
     with stream:
         for event in stream:
-            event_data = event.model_dump() if hasattr(event, "model_dump") else event
+            event_data = synthesizer.process_event(event)
             if not isinstance(event_data, dict):
                 continue
             managed_session_id = event_data.get("session_id") or managed_session_id
             event_type = event_data.get("type", "")
-            if event_type == "agent.session.turn.completed":
+            if event_type in ("agent.session.turn.completed", "response.done"):
                 completed_turn_id = (
                     event_data.get("turn", {}).get("id")
                     or event_data.get("turn_id")
@@ -223,11 +231,22 @@ def evaluate_candidate_application(
     trace_s3_url = ""
     trace_status = "UNAVAILABLE"
     try:
-        trace_doc = export_session_traces(managed_session_id)
+        trace_doc = synthesizer.build_otlp_document()
         trace_s3_url = upload_trace(application_id, trace_doc, filename="session_trace.otlp.json")
         trace_status = "EXPORTED"
+        print(f"[Evaluator] Successfully synthesized and uploaded OTLP trace from real-time stream: {trace_s3_url}", flush=True)
+
+        # Upload raw stream events audit log
+        raw_events_doc = {"session_id": managed_session_id, "events": synthesizer.get_raw_events()}
+        upload_trace(application_id, raw_events_doc, filename="session_events.json")
     except Exception as exc:
-        print(f"[Evaluator] OTLP trace export unavailable: {exc}", flush=True)
+        print(f"[Evaluator] Stream OTLP synthesis failed, trying fallback: {exc}", flush=True)
+        try:
+            trace_doc = export_session_traces(managed_session_id)
+            trace_s3_url = upload_trace(application_id, trace_doc, filename="session_trace.otlp.json")
+            trace_status = "EXPORTED"
+        except Exception as fallback_exc:
+            print(f"[Evaluator] Fallback OTLP trace export also unavailable: {fallback_exc}", flush=True)
 
     summary_metrics = {
         "session_id": managed_session_id,
