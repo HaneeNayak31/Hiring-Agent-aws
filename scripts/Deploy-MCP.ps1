@@ -34,10 +34,16 @@ $imageUri = "$repositoryUri`:$ImageTag"
 
 Write-Host "Deploying MCP image: $imageUri" -ForegroundColor Cyan
 
-$null = aws ecr describe-repositories --repository-names $RepositoryName --region $Region @awsArgs 2>$null
-if ($LASTEXITCODE -ne 0) {
+$previousErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+$null = & aws ecr describe-repositories --repository-names $RepositoryName --region $Region @awsArgs 2>&1
+$repositoryCheckExitCode = $LASTEXITCODE
+$ErrorActionPreference = $previousErrorActionPreference
+
+if ($repositoryCheckExitCode -ne 0) {
     Write-Host "Creating ECR repository: $RepositoryName"
     aws ecr create-repository --repository-name $RepositoryName --region $Region @awsArgs | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Failed to create ECR repository: $RepositoryName" }
 }
 
 aws ecr get-login-password --region $Region @awsArgs |
