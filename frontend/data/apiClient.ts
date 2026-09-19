@@ -123,6 +123,7 @@ export interface JobRoleDetail {
   responsibilities: string[];
   required_skills: string[];
   preferred_skills: string[];
+  evaluation_guidance?: string;
   benefits: string[];
   submission_requirements: SubmissionRequirementsData;
   applications_count?: number;
@@ -148,19 +149,14 @@ export interface ApplicationRecord {
   };
   cover_note?: string;
   status: string;
-  readiness_tier?: string;
-  readiness_score_pct?: number;
   submitted_at: string;
   evaluated_at?: string;
   report_s3_url?: string;
   trace_s3_url?: string;
   evaluation_summary?: {
     session_id: string;
-    recommendation: string;
-    candidate_repo: string;
-    total_commands_run: number;
-    total_reasoning_steps: number;
-    total_raw_events: number;
+    repositories_total?: number;
+    trace_status?: string;
   };
 }
 

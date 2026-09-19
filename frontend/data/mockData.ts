@@ -9,9 +9,9 @@ export interface EvidenceSource {
 
 export interface VerifiedSkill {
   name: string;
-  status: 'VERIFIED' | 'LIMITED' | 'UNVERIFIED';
-  confidence: number; // 0 - 100
-  sourcesCount: number;
+  status: 'OBSERVED' | 'VERIFIED' | 'LIMITED' | 'UNVERIFIED';
+  confidence?: number;
+  sourcesCount?: number;
   sources: EvidenceSource[];
 }
 
@@ -21,9 +21,7 @@ export interface CandidateReport {
   name: string;
   role: string;
   appliedDate: string;
-  fitScore: number;
-  evidenceCoverage: number; // %
-  status: 'RECEIVED' | 'ANALYZING' | 'VERIFYING' | 'VERIFIED' | 'INTERVIEW_READY' | 'REVIEW_REQUIRED' | 'REJECTED';
+  status: 'RECEIVED' | 'ANALYZING' | 'VERIFYING' | 'INSPECTED' | 'REVIEW_REQUIRED';
   bio: string;
   agentSessionId?: string;
   repoUrl?: string;
@@ -67,6 +65,7 @@ export interface OpenRole {
   mcpExposed: boolean;
   requiredSkills: string[];
   preferredSkills: string[];
+  evaluation_guidance?: string;
   activity: {
     timestamp: string;
     message: string;

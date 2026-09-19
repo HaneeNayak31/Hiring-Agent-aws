@@ -138,7 +138,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                             <span className="text-white/40 text-[11px] block">{cand.role}</span>
                           </div>
                         </div>
-                        <span className="text-[10px] text-primary font-bold">FIT {cand.fitScore}%</span>
+                        <span className="text-[10px] text-primary font-bold">{cand.status}</span>
                       </button>
                     ))}
                   </div>

@@ -160,8 +160,8 @@ export default function ReportsPage() {
                     {report.appliedDate}
                   </div>
 
-                  <div className="col-span-1 font-bold text-emerald-400">
-                    {report.evidenceCoverage}%
+                  <div className="col-span-1 font-bold text-emerald-400 text-[10px] uppercase">
+                    Markdown ready
                   </div>
 
                   <div className="col-span-2 text-right">

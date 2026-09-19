@@ -25,12 +25,34 @@ def _load_openai_key_from_secret() -> None:
     secret_arn = os.getenv("OPENAI_API_KEY_SECRET_ARN")
     if not secret_arn:
         return
-    secret = boto3.client("secretsmanager").get_secret_value(SecretId=secret_arn)
-    value = secret.get("SecretString", "")
-    parsed = json.loads(value) if value else {}
-    key = parsed.get("OPENAI_API_KEY", "")
-    if key:
-        os.environ["OPENAI_API_KEY"] = key
+    try:
+        secret = boto3.client("secretsmanager").get_secret_value(SecretId=secret_arn)
+        value = (secret.get("SecretString") or "").strip()
+        if not value:
+            return
+
+        key = ""
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, dict):
+                key = parsed.get("OPENAI_API_KEY", "") or parsed.get("openai_api_key", "")
+            elif isinstance(parsed, str):
+                key = parsed
+        except Exception:
+            pass
+
+        if not key:
+            import re
+            match = re.search(r"(?:OPENAI_API_KEY\s*[:=]\s*|\"OPENAI_API_KEY\"\s*:\s*\")?([A-Za-z0-9_\-]{20,})", value)
+            if value.startswith("sk-"):
+                key = value
+            elif match:
+                key = match.group(1)
+
+        if key:
+            os.environ["OPENAI_API_KEY"] = key.strip()
+    except Exception as exc:
+        print(f"[Agent] Warning: Could not retrieve secret from Secrets Manager: {exc}", flush=True)
 
 
 client = None
@@ -47,8 +69,24 @@ def _get_client() -> OpenAI:
         client = OpenAI()
     return client
 
-REPORTS_DIR = Path(__file__).parent / "reports"
-REPORTS_DIR.mkdir(exist_ok=True)
+
+def get_openai_api_key() -> str:
+    """Return the configured API key for REST endpoints such as OTLP export."""
+    _load_openai_key_from_secret()
+    key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not configured. Populate the configured Secrets Manager secret before evaluating candidates."
+        )
+    return key
+
+
+REPORTS_DIR = Path("/tmp/reports" if os.getenv("AWS_LAMBDA_FUNCTION_NAME") else Path(__file__).parent / "reports")
+try:
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    REPORTS_DIR = Path("/tmp/reports")
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def download_session_artifacts(
@@ -101,6 +139,8 @@ def create_agent_session(
     repo_url: str,
     session_id: Optional[str] = None,
     instructions: Optional[str] = None,
+    repositories: Optional[List[dict]] = None,
+    job_context: Optional[dict] = None,
 ) -> Tuple[Any, str]:
     """
     Creates an OpenAI Agents API streaming session for candidate repository evaluation.
@@ -111,7 +151,12 @@ def create_agent_session(
     """
     session_uuid = session_id or f"sess_{uuid.uuid4().hex}"
     plugins = load_plugins()
-    input_text = create_input(repo_url, instructions)
+    input_text = create_input(
+        repo_url=repo_url,
+        instructions=instructions,
+        repositories=repositories,
+        job_context=job_context,
+    )
 
     # Strictly use OpenAI Agents API streaming session
     stream = _get_client().beta.agents.sessions.create(
@@ -121,6 +166,12 @@ def create_agent_session(
             "reasoning": {
                 "effort": "low",
                 "summary": "auto",
+            },
+            "multi_agent": {
+                "enabled": True,
+                "max_concurrent_subagents": max(
+                    1, min(int(os.getenv("MAX_CONCURRENT_SUBAGENTS", "3")), 3)
+                ),
             },
         },
         environment={

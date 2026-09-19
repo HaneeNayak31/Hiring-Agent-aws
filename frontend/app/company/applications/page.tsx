@@ -75,7 +75,7 @@ export default function CompanyApplicationsPage() {
           </div>
 
           <div className="flex flex-wrap gap-2 shrink-0">
-            {['ALL', 'VERIFIED', 'VERIFYING', 'INTERVIEW_READY', 'REVIEW_REQUIRED'].map((st) => (
+            {['ALL', 'RECEIVED', 'VERIFYING', 'INSPECTED', 'REVIEW_REQUIRED'].map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
@@ -114,7 +114,7 @@ export default function CompanyApplicationsPage() {
             <p className="text-white/50 text-xs max-w-md mx-auto mb-6">
               {apiError
                 ? 'Unable to connect to the backend application registry. Please check your API Gateway connection and retry.'
-                : 'Applications submitted by candidates or AI agents via the MCP protocol will automatically appear here with automated evaluation scores.'}
+                 : 'Applications submitted by candidates or AI agents via the MCP protocol will automatically appear here for repository inspection.'}
             </p>
             {searchTerm && (
               <button
@@ -158,26 +158,21 @@ export default function CompanyApplicationsPage() {
 
                 <div className="flex flex-wrap items-center gap-8 shrink-0">
                   <div className="text-right">
-                    <span className="text-[10px] text-white/40 block">PROFILE FIT</span>
-                    <span className="font-bold text-2xl text-primary">{app.fitScore}%</span>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-[10px] text-white/40 block">EVIDENCE</span>
-                    <span className="font-bold text-2xl text-emerald-400">{app.evidenceCoverage}%</span>
+                    <span className="text-[10px] text-white/40 block">INSPECTION</span>
+                    <span className="font-bold text-sm text-primary">REPOSITORY REVIEW</span>
                   </div>
 
                   <div className="shrink-0">
                     <span
                       className={`px-3 py-1 text-xs font-bold uppercase border flex items-center gap-1.5 ${
-                        app.status === 'VERIFIED'
+                        app.status === 'INSPECTED'
                           ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
-                          : app.status === 'INTERVIEW_READY'
+                          : app.status === 'VERIFYING'
                           ? 'border-primary text-primary bg-primary/10'
                           : 'border-amber-500/40 text-amber-400 bg-amber-500/10'
                       }`}
                     >
-                      {app.status === 'VERIFIED' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                      {app.status === 'INSPECTED' && <CheckCircle2 className="w-3.5 h-3.5" />}
                       {app.status === 'VERIFYING' && <Clock className="w-3.5 h-3.5 animate-spin" />}
                       {app.status}
                     </span>

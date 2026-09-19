@@ -1,6 +1,6 @@
 """
 S3 Storage Adapter for Candidate Assessment Reports & Execution Traces.
-Persists candidate_intelligence_report.md and trace.json to S3 under
+Persists candidate_intelligence_report.md and session_trace.otlp.json to S3 under
 'applications/{application_id}/' with local directory fallback.
 """
 
@@ -19,8 +19,12 @@ AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 S3_BUCKET = os.getenv("S3_ASSESSMENT_BUCKET", "hiring-agent-assessments")
 ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL")
 
-LOCAL_REPORTS_DIR = Path(__file__).parent / "reports"
-LOCAL_REPORTS_DIR.mkdir(exist_ok=True)
+LOCAL_REPORTS_DIR = Path("/tmp/reports" if os.getenv("AWS_LAMBDA_FUNCTION_NAME") else Path(__file__).parent / "reports")
+try:
+    LOCAL_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    LOCAL_REPORTS_DIR = Path("/tmp/reports")
+    LOCAL_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_s3_client():
@@ -37,9 +41,8 @@ def upload_report(
 ) -> str:
     """
     Uploads the candidate intelligence markdown report to S3.
-    Fallback: saves locally to agents/reports/{application_id}/.
+    Fallback: saves locally to /tmp/reports/{application_id}/.
     """
-    # Read content
     if isinstance(content, Path):
         text_content = content.read_text(encoding="utf-8")
         body_bytes = content.read_bytes()
@@ -53,7 +56,6 @@ def upload_report(
     s3_key = f"applications/{application_id}/{filename}"
     s3_url = f"s3://{S3_BUCKET}/{s3_key}"
 
-    # Always ensure local copy exists for fast local UI rendering
     local_dir = LOCAL_REPORTS_DIR / application_id
     local_dir.mkdir(parents=True, exist_ok=True)
     local_file = local_dir / filename
@@ -77,11 +79,11 @@ def upload_report(
 def upload_trace(
     application_id: str,
     trace_data: Dict[str, Any],
-    filename: str = "trace.json"
+    filename: str = "session_trace.otlp.json"
 ) -> str:
     """
     Uploads the complete dual-layer execution trace (raw events + structured sections) to S3.
-    Fallback: saves locally to agents/reports/{application_id}/.
+    Fallback: saves locally to /tmp/reports/{application_id}/.
     """
     json_str = json.dumps(trace_data, indent=2, default=str)
     body_bytes = json_str.encode("utf-8")
@@ -89,7 +91,6 @@ def upload_trace(
     s3_key = f"applications/{application_id}/{filename}"
     s3_url = f"s3://{S3_BUCKET}/{s3_key}"
 
-    # Always ensure local copy exists for fast local UI rendering
     local_dir = LOCAL_REPORTS_DIR / application_id
     local_dir.mkdir(parents=True, exist_ok=True)
     local_file = local_dir / filename
@@ -124,7 +125,7 @@ def get_report(application_id: str, filename: str = "candidate_intelligence_repo
     return None
 
 
-def get_trace(application_id: str, filename: str = "trace.json") -> Optional[Dict[str, Any]]:
+def get_trace(application_id: str, filename: str = "session_trace.otlp.json") -> Optional[Dict[str, Any]]:
     """Retrieves full trace dictionary from S3 or local storage."""
     s3_key = f"applications/{application_id}/{filename}"
     try:

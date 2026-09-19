@@ -42,7 +42,7 @@ export default function CompanyDashboard() {
 
   const activeRolesCount = rolesList.filter((r) => r.status === 'OPEN').length;
   const inVerificationCount = applications.filter((a) => a.status === 'SUBMITTED_PENDING_SANDBOX' || a.status === 'EVALUATING').length;
-  const interviewReadyCount = applications.filter((a) => a.status === 'EVALUATED' || a.status === 'INTERVIEW_READY').length;
+  const inspectedCount = applications.filter((a) => a.status === 'EVALUATED').length;
 
   return (
     <div className="min-h-screen bg-black text-white font-sans">
@@ -106,8 +106,8 @@ export default function CompanyDashboard() {
           </div>
 
           <div className="border border-white/20 bg-black p-6 flex flex-col justify-between">
-            <span className="text-white/40 block text-[10px] uppercase tracking-widest mb-4">// INTERVIEW READY</span>
-            <span className="font-bold text-4xl text-emerald-400 block leading-none">{interviewReadyCount}</span>
+            <span className="text-white/40 block text-[10px] uppercase tracking-widest mb-4">// INSPECTION REPORTS READY</span>
+            <span className="font-bold text-4xl text-emerald-400 block leading-none">{inspectedCount}</span>
           </div>
         </div>
 

@@ -21,7 +21,7 @@ export default function CandidateAgentDrawer({
   onClose,
 }: CandidateAgentDrawerProps) {
   const [activeTab, setActiveTab] = useState<'CHAT' | 'REPORT'>('CHAT');
-  const { sessionState, isStreaming, startEvaluation, loadExistingReport } = useAgentEvaluation();
+  const { sessionState, isStreaming, startEvaluation, loadExistingReport, trace, traceLoading } = useAgentEvaluation();
 
   const repoUrl =
     (candidate as any)?.repoUrl ||
@@ -102,15 +102,7 @@ export default function CandidateAgentDrawer({
 
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-3 border border-white/15 px-3 py-1.5 bg-white/[0.02]">
-              <div className="text-right">
-                <span className="text-[9px] text-white/40 block">FIT SCORE</span>
-                <span className="font-bold text-sm text-primary">{candidate.fitScore}%</span>
-              </div>
-              <div className="w-px h-6 bg-white/15" />
-              <div className="text-right">
-                <span className="text-[9px] text-white/40 block">EVIDENCE</span>
-                <span className="font-bold text-sm text-emerald-400">{candidate.evidenceCoverage}%</span>
-              </div>
+              <span className="text-[9px] text-white/50 uppercase">Repository inspection workspace</span>
             </div>
 
             <div className="flex bg-white/5 border border-white/15 p-0.5 rounded-sharp">
@@ -195,6 +187,8 @@ export default function CandidateAgentDrawer({
                     roleTitle={candidate.role}
                     repoUrl={repoUrl}
                     isStreaming={isStreaming}
+                    trace={trace}
+                    traceLoading={traceLoading}
                     onRunEvaluation={(instructions) => startEvaluation(repoUrl, instructions)}
                     onOpenReport={() => setActiveTab('REPORT')}
                   />

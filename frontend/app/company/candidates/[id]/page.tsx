@@ -185,11 +185,11 @@ export default function CandidateDetailWorkspace() {
           <div className="flex items-center gap-6 shrink-0 print:hidden">
             <div className="border border-white/20 p-4 bg-white/[0.02]">
               <span className="text-white/40 block text-[10px]">REQUIREMENT ALIGNMENT</span>
-              <span className="font-bold text-3xl text-primary">{cand.fitScore}%</span>
+              <span className="font-bold text-sm text-primary uppercase">Repository inspection</span>
             </div>
             <div className="border border-white/20 p-4 bg-white/[0.02]">
               <span className="text-white/40 block text-[10px]">EVIDENCE COVERAGE</span>
-              <span className="font-bold text-3xl text-emerald-400">{cand.evidenceCoverage}%</span>
+              <span className="font-bold text-sm text-emerald-400 uppercase">Evidence report</span>
             </div>
           </div>
         </div>
@@ -293,7 +293,7 @@ export default function CandidateDetailWorkspace() {
             <div className="border border-white/15 bg-white/[0.01] p-6 text-xs">
               <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                 <span className="font-bold text-primary uppercase tracking-widest">// SOURCE PROCESSING STATUS</span>
-                <span className="text-white/50">EVIDENCE COVERAGE: {cand.evidenceCoverage}%</span>
+                <span className="text-white/50">EVIDENCE: FILES, COMMANDS, AND COMMITS</span>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -382,7 +382,7 @@ export default function CandidateDetailWorkspace() {
                       <span className="font-bold text-base text-primary uppercase">{selectedSkillData.name}</span>
                     </div>
                     <span className="text-xs px-2 py-0.5 bg-white/10 text-white">
-                      CONFIDENCE: {selectedSkillData.confidence}%
+                      STATUS: {selectedSkillData.status}
                     </span>
                   </div>
 
@@ -433,9 +433,9 @@ export default function CandidateDetailWorkspace() {
                   <div key={idx} className="p-4 border border-white/10 bg-white/[0.02] flex justify-between items-center">
                     <div>
                       <div className="font-bold text-white text-sm font-sans">{sk.name}</div>
-                      <div className="text-[10px] text-white/40">{sk.sourcesCount || 0} proving sources</div>
+                      <div className="text-[10px] text-white/40">Repository evidence references</div>
                     </div>
-                    <span className="text-emerald-400 font-bold text-xs">{sk.confidence}% VERIFIED</span>
+                    <span className="text-emerald-400 font-bold text-xs">{sk.status}</span>
                   </div>
                 ))}
               </div>

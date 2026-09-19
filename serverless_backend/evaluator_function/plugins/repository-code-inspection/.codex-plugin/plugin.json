@@ -1,0 +1,6 @@
+{
+  "name": "repository-code-inspection",
+  "version": "1.0.0",
+  "description": "Compact evidence-first inspection of repository structure, code, tests, security, Git history, and deployment configuration.",
+  "skills": "./skills/"
+}

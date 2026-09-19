@@ -1,6 +1,0 @@
-{
-  "name": "test-rigor-evaluator",
-  "version": "1.0.0",
-  "description": "Evaluate the quality and rigor of repository tests.",
-  "skills": "./skills/"
-}

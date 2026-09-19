@@ -3,10 +3,10 @@ AWS Lambda Handler for Candidate Evaluation via DynamoDB Streams.
 Triggered automatically on INSERT event from the Applications table.
 Orchestrates:
 1. Candidate repository cloning in sandbox environment.
-2. Lossless trace capture via TraceCollector (every token, reasoning thought, command, output).
+2. Multi-agent repository inspection in the managed Agents API.
 3. Report downloading from /workspace/outputs.
-4. S3 upload of candidate_intelligence_report.md and trace.json.
-5. DynamoDB update to EVALUATED with S3 links and summary metrics.
+4. OTLP trace export after the session completes.
+5. DynamoDB update with report/trace links and inspection metadata.
 """
 
 import os
@@ -24,7 +24,7 @@ load_dotenv()
 
 # Internal module imports
 from agent import create_agent_session, download_session_artifacts, REPORTS_DIR
-from trace_collector import TraceCollector
+from otlp_traces import export_session_traces
 from s3_storage import upload_report, upload_trace
 
 AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
@@ -53,16 +53,33 @@ def _float_to_decimal(obj: Any) -> Any:
     return obj
 
 
-def _extract_recommendation(report_text: str) -> str:
-    """Extracts high-level recommendation from markdown report."""
-    first_paragraph = report_text[:600].lower()
-    if "strong hire" in first_paragraph or "hire" in first_paragraph:
-        return "HIRE"
-    if "interview" in first_paragraph:
-        return "INTERVIEW_WITH_VERIFICATION"
-    if "reject" in first_paragraph or "not recommend" in first_paragraph:
-        return "REJECT"
-    return "REVIEW"
+def _get_job(job_id: Optional[str]) -> Dict[str, Any]:
+    """Load role context so recruiter guidance reaches the coordinator."""
+    if not job_id:
+        return {}
+    try:
+        table = _get_dynamodb_resource().Table(JOBS_TABLE_NAME)
+        return table.get_item(Key={"job_id": job_id}).get("Item") or {}
+    except Exception as exc:
+        print(f"[Evaluator] Could not load job {job_id}: {exc}", flush=True)
+        return {}
+
+
+def _extract_repositories(passport: Dict[str, Any]) -> list[Dict[str, Any]]:
+    """Return every valid repository from the candidate passport."""
+    repositories = []
+    for index, project in enumerate(passport.get("projects", []) or [], start=1):
+        if not isinstance(project, dict):
+            continue
+        url = str(project.get("repository_url", "")).strip()
+        if not url.startswith(("http://", "https://")):
+            continue
+        repositories.append({
+            "repository_id": f"project-{index}",
+            "display_name": project.get("title") or f"Project {index}",
+            "repository_url": url,
+        })
+    return repositories
 
 
 def update_application_status(
@@ -77,6 +94,16 @@ def update_application_status(
         dynamodb = _get_dynamodb_resource()
         table = dynamodb.Table(APPS_TABLE_NAME)
         now_iso = datetime.now(timezone.utc).isoformat()
+
+        # Ensure parent verification_pipeline map exists to avoid ValidationException
+        try:
+            table.update_item(
+                Key={"application_id": application_id},
+                UpdateExpression="SET verification_pipeline = if_not_exists(verification_pipeline, :empty_map)",
+                ExpressionAttributeValues={":empty_map": {}}
+            )
+        except Exception:
+            pass
 
         if status == "EVALUATING":
             table.update_item(
@@ -128,105 +155,103 @@ def update_application_status(
 
 def evaluate_candidate_application(
     application_id: str,
-    repo_url: str,
+    repositories: list[Dict[str, Any]],
+    job_context: Optional[Dict[str, Any]] = None,
     instructions: Optional[str] = None,
-    session_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-    Executes the candidate evaluation workflow:
-    - Sets DynamoDB status to EVALUATING.
-    - Runs agent session with TraceCollector.
-    - Saves report and trace to S3.
-    - Sets DynamoDB status to EVALUATED.
-    """
-    print(f"\n[Evaluator] Processing application '{application_id}' (repo: {repo_url})...", flush=True)
+    """Run one coordinator session that delegates one repository per subagent."""
+    if not repositories:
+        raise ValueError("At least one repository is required for inspection.")
 
-    # 1. Update status to EVALUATING
+    print(
+        f"\n[Evaluator] Processing application '{application_id}' "
+        f"with {len(repositories)} repositories...",
+        flush=True,
+    )
     update_application_status(application_id, "EVALUATING")
 
-    # 2. Initialize TraceCollector & agent session
-    session_uuid = session_id or f"sess_{uuid.uuid4().hex}"
-    collector = TraceCollector(
-        session_id=session_uuid,
-        repo_url=repo_url,
-        application_id=application_id
-    )
-
-    stream, s_id = create_agent_session(
-        repo_url=repo_url,
-        session_id=session_uuid,
-        instructions=instructions
+    first_repo_url = repositories[0]["repository_url"]
+    stream, _ = create_agent_session(
+        repo_url=first_repo_url,
+        instructions=instructions,
+        repositories=repositories,
+        job_context=job_context,
     )
 
     app_reports_dir = REPORTS_DIR / application_id
     app_reports_dir.mkdir(parents=True, exist_ok=True)
-    turn_completed = False
+    managed_session_id = None
+    completed_turn_id = None
 
     with stream:
         for event in stream:
-            event_data = collector.process_event(event)
+            event_data = event.model_dump() if hasattr(event, "model_dump") else event
+            if not isinstance(event_data, dict):
+                continue
+            managed_session_id = event_data.get("session_id") or managed_session_id
             event_type = event_data.get("type", "")
-
-            if event_type == "agent.session.turn.completed" and not turn_completed:
-                turn_completed = True
-                turn_id = event_data.get("turn", {}).get("id") or event_data.get("turn_id")
-                target_sid = event_data.get("session_id") or session_uuid
-                download_session_artifacts(
-                    session_id=target_sid,
-                    turn_id=turn_id,
-                    destination_dir=app_reports_dir
+            if event_type == "agent.session.turn.completed":
+                completed_turn_id = (
+                    event_data.get("turn", {}).get("id")
+                    or event_data.get("turn_id")
+                    or completed_turn_id
                 )
 
-    # 3. Finalize trace document
-    trace_doc = collector.finalize()
+    if not managed_session_id:
+        raise RuntimeError("Agents API did not return a managed session ID.")
 
-    # 4. Locate or assemble report markdown
+    download_session_artifacts(
+        session_id=managed_session_id,
+        turn_id=completed_turn_id,
+        destination_dir=app_reports_dir,
+    )
+
     report_file = app_reports_dir / "candidate_intelligence_report.md"
     if not report_file.exists():
         md_files = list(app_reports_dir.glob("*.md"))
-        if md_files:
-            report_file = md_files[0]
-        else:
-            fallback_text = "".join(collector.accumulated_text_chunks)
-            if not fallback_text:
-                fallback_text = f"# Candidate Evaluation Report\n\nNo report generated for {repo_url}."
-            report_file.write_text(fallback_text, encoding="utf-8")
+        report_file = md_files[0] if md_files else report_file
+    if not report_file.exists():
+        report_file.write_text(
+            "# Candidate Repository Inspection Report\n\n"
+            "No Markdown inspection report was published by the coordinator.",
+            encoding="utf-8",
+        )
 
     report_markdown = report_file.read_text(encoding="utf-8")
-
-    # 5. Upload report and full trace to S3
     report_s3_url = upload_report(application_id, report_markdown)
-    trace_s3_url = upload_trace(application_id, trace_doc)
 
-    # 6. Build summary and update DynamoDB to EVALUATED
-    recommendation = _extract_recommendation(report_markdown)
+    trace_s3_url = ""
+    trace_status = "UNAVAILABLE"
+    try:
+        trace_doc = export_session_traces(managed_session_id)
+        trace_s3_url = upload_trace(application_id, trace_doc, filename="session_trace.otlp.json")
+        trace_status = "EXPORTED"
+    except Exception as exc:
+        print(f"[Evaluator] OTLP trace export unavailable: {exc}", flush=True)
+
     summary_metrics = {
-        "session_id": session_uuid,
-        "recommendation": recommendation,
-        "candidate_repo": repo_url,
-        "total_commands_run": len(trace_doc["structured_trace"]["commands_executed"]),
-        "total_reasoning_steps": len(trace_doc["structured_trace"]["reasoning_entries"]),
-        "total_raw_events": len(trace_doc["raw_events"]),
-        "completed_at": datetime.now(timezone.utc).isoformat()
+        "session_id": managed_session_id,
+        "repositories_total": len(repositories),
+        "repositories": repositories,
+        "trace_status": trace_status,
+        "completed_at": datetime.now(timezone.utc).isoformat(),
     }
-
     update_application_status(
         application_id=application_id,
         status="EVALUATED",
         report_s3_url=report_s3_url,
         trace_s3_url=trace_s3_url,
-        summary=summary_metrics
+        summary=summary_metrics,
     )
 
-    print(f"[Evaluator] Completed application '{application_id}': {recommendation}", flush=True)
-
+    print(f"[Evaluator] Completed application '{application_id}' inspection", flush=True)
     return {
         "status": "COMPLETED",
         "application_id": application_id,
-        "session_id": session_uuid,
-        "recommendation": recommendation,
+        "session_id": managed_session_id,
+        "repositories_total": len(repositories),
         "report_s3_url": report_s3_url,
-        "trace_s3_url": trace_s3_url
+        "trace_s3_url": trace_s3_url,
     }
 
 
@@ -244,12 +269,18 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
             app_id = deserialized.get("application_id")
             passport = deserialized.get("candidate_passport", {})
-            projects = passport.get("projects", [])
-            repo_url = projects[0].get("repository_url") if projects else None
+            repositories = _extract_repositories(passport)
+            job_context = _get_job(deserialized.get("job_id"))
+            recruiter_guidance = job_context.get("evaluation_guidance")
 
-            if app_id and repo_url:
+            if app_id and repositories:
                 try:
-                    res = evaluate_candidate_application(application_id=app_id, repo_url=repo_url)
+                    res = evaluate_candidate_application(
+                        application_id=app_id,
+                        repositories=repositories,
+                        job_context=job_context,
+                        instructions=recruiter_guidance,
+                    )
                     processed.append(res)
                 except Exception as exc:
                     update_application_status(app_id, "FAILED", summary={"error": str(exc)})
@@ -276,4 +307,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 if __name__ == "__main__":
     test_app_id = "app-test-01"
     test_repo = "https://github.com/JainilPatel2502/NeuroBuilder-Frontend.git"
-    evaluate_candidate_application(application_id=test_app_id, repo_url=test_repo)
+    evaluate_candidate_application(
+        application_id=test_app_id,
+        repositories=[{"repository_id": "project-1", "repository_url": test_repo}],
+    )

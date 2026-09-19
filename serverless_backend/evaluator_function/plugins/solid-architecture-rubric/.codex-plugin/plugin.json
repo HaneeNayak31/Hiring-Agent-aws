@@ -1,6 +1,0 @@
-{
-  "name": "solid-architecture-rubric",
-  "version": "1.0.0",
-  "description": "Evaluate software architecture using SOLID principles.",
-  "skills": "./skills/"
-}

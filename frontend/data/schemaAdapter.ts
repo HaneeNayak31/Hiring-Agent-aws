@@ -38,9 +38,7 @@ export function mapApplicationToCandidateReport(app: ApplicationRecord): Candida
 
   const mappedSkills: VerifiedSkill[] = skillsList.map((sk: any) => ({
     name: typeof sk === 'string' ? sk : sk.name || 'Skill',
-    status: app.status === 'EVALUATED' ? 'VERIFIED' : 'LIMITED',
-    confidence: app.readiness_score_pct ? Math.min(100, Math.max(60, app.readiness_score_pct)) : 88,
-    sourcesCount: 2,
+    status: app.status === 'EVALUATED' ? 'OBSERVED' : 'LIMITED',
     sources: [
       {
         type: 'GitHub',
@@ -52,7 +50,7 @@ export function mapApplicationToCandidateReport(app: ApplicationRecord): Candida
   }));
 
   let uiStatus: CandidateReport['status'] = 'RECEIVED';
-  if (app.status === 'EVALUATED') uiStatus = 'VERIFIED';
+  if (app.status === 'EVALUATED') uiStatus = 'INSPECTED';
   else if (app.status === 'EVALUATING' || app.status === 'SUBMITTED_PENDING_SANDBOX') uiStatus = 'VERIFYING';
 
   return {
@@ -63,8 +61,6 @@ export function mapApplicationToCandidateReport(app: ApplicationRecord): Candida
     appliedDate: app.submitted_at
       ? new Date(app.submitted_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
       : 'Recent',
-    fitScore: app.readiness_score_pct || 85,
-    evidenceCoverage: app.status === 'EVALUATED' ? 92 : 65,
     status: uiStatus,
     bio: passport.summary || 'Applicant submitted via Hiring Agent MCP protocol.',
     agentSessionId: app.evaluation_summary?.session_id || app.application_id,
@@ -75,25 +71,16 @@ export function mapApplicationToCandidateReport(app: ApplicationRecord): Candida
       portfolio: !!passport.profiles?.portfolio,
       linkedin: !!passport.profiles?.linkedin,
     },
-    skills: mappedSkills.length > 0 ? mappedSkills : [
-      { name: 'TypeScript', status: 'VERIFIED', confidence: 95, sourcesCount: 2, sources: [] },
-      { name: 'AWS', status: 'VERIFIED', confidence: 90, sourcesCount: 2, sources: [] },
-    ],
+    skills: mappedSkills,
     projects: projects.map((p: any) => ({
       name: p.title || 'Project',
       description: p.description || '',
       tech: p.tech_stack || [],
       url: p.repository_url || p.live_url || '',
     })),
-    potentialGaps: ['Check production error-boundary coverage during technical round.'],
-    interviewAreas: ['Distributed Systems', 'Test Rigor', 'SOLID Architecture'],
-    suggestedQuestions: [
-      {
-        number: 'Q1',
-        question: 'How do you structure concurrency and error handling in your repositories?',
-        context: 'Generated from sandbox telemetry inspection.',
-      },
-    ],
+    potentialGaps: [],
+    interviewAreas: [],
+    suggestedQuestions: [],
   };
 }
 

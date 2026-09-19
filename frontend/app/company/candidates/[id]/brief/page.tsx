@@ -231,7 +231,7 @@ export default function CandidateInterviewBriefPage() {
           </div>
 
           <div className="pt-6 border-t border-white/20 text-xs text-white/50 flex justify-between font-mono print:border-black print:text-black">
-            <span>EVIDENCE TRACEABILITY: {cand.evidenceCoverage || 0}% VERIFIED</span>
+            <span>EVIDENCE TRACEABILITY: FILES, COMMANDS, AND COMMITS</span>
             <span className="text-primary font-bold">VERIFIED VIA LIVE BACKEND</span>
           </div>
         </div>

@@ -161,7 +161,7 @@ export default function RoleDetailPage() {
 
   const filteredApplicants = roleApplicants.filter((cand) => {
     if (funnelFilter === 'VERIFYING') return cand.status === 'VERIFYING';
-    if (funnelFilter === 'INTERVIEW_READY') return cand.status === 'INTERVIEW_READY' || cand.status === 'VERIFIED';
+    if (funnelFilter === 'INSPECTED') return cand.status === 'INSPECTED';
     return true;
   });
 
@@ -299,7 +299,7 @@ export default function RoleDetailPage() {
               <div className="border border-white/15 bg-white/[0.02] p-5">
                 <span className="text-white/40 block text-[10px] uppercase">// INTERVIEW READY</span>
                 <span className="font-bold text-3xl text-emerald-400 mt-1 block">
-                  {roleApplicants.filter((c) => c.status === 'INTERVIEW_READY' || c.status === 'VERIFIED').length}
+                  {roleApplicants.filter((c) => c.status === 'INSPECTED').length}
                 </span>
               </div>
             </div>
@@ -356,14 +356,14 @@ export default function RoleDetailPage() {
 
                 <button
                   onClick={() => {
-                    setFunnelFilter('INTERVIEW_READY');
+                    setFunnelFilter('INSPECTED');
                     setActiveTab('APPLICANTS');
                   }}
                   className="border border-white/20 bg-white/[0.02] p-4 text-white hover:border-primary hover:bg-primary/10 transition-colors"
                 >
                   <span className="text-[10px] block uppercase mb-1">INTERVIEW READY</span>
                   <span className="font-bold text-2xl text-emerald-400">
-                    {roleApplicants.filter((c) => c.status === 'INTERVIEW_READY' || c.status === 'VERIFIED').length}
+                    {roleApplicants.filter((c) => c.status === 'INSPECTED').length}
                   </span>
                   <div className="h-1 bg-emerald-400 mt-3" />
                 </button>
@@ -412,7 +412,7 @@ export default function RoleDetailPage() {
                             {cand.name}
                           </div>
                           <div className="text-[10px] text-white/40">
-                            Fit: <span className="text-primary font-bold">{cand.fitScore}%</span> · Evidence: <span className="text-emerald-400 font-bold">{cand.evidenceCoverage}%</span>
+                            Inspection: <span className="text-primary font-bold">{cand.status}</span>
                           </div>
                         </div>
                       </div>
@@ -546,7 +546,7 @@ export default function RoleDetailPage() {
                       <div className="col-span-2 font-mono">
                         <span
                           className={`px-2 py-0.5 text-[10px] font-bold uppercase border ${
-                            cand.status === 'VERIFIED'
+                              cand.status === 'INSPECTED'
                               ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
                               : 'border-amber-500/40 text-amber-400 bg-amber-500/10'
                           }`}
@@ -556,7 +556,7 @@ export default function RoleDetailPage() {
                       </div>
 
                       <div className="col-span-2 font-mono">
-                        <span className="font-bold text-emerald-400">{cand.evidenceCoverage}%</span>
+                        <span className="font-bold text-emerald-400 text-[10px] uppercase">Report available</span>
                       </div>
 
                       <div className="col-span-2 text-right">
@@ -610,7 +610,7 @@ export default function RoleDetailPage() {
                 <div key={report.id} className="border border-white/15 bg-black p-6 flex justify-between items-center">
                   <div>
                     <div className="font-bold text-lg text-white font-sans">{report.name}</div>
-                    <div className="text-xs text-white/50">Report ID: {report.id} · Coverage: {report.evidenceCoverage}%</div>
+                    <div className="text-xs text-white/50">Report ID: {report.id} · Markdown inspection report</div>
                   </div>
                   <div className="flex items-center gap-3">
                     <button

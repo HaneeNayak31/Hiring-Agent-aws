@@ -14,7 +14,6 @@ import {
   Settings,
 } from 'lucide-react';
 import CommandPalette from '@/components/layout/CommandPalette';
-import CreateRoleDrawer from '@/components/company/CreateRoleDrawer';
 
 const companyLinks = [
   { href: '/company', label: 'OVERVIEW', icon: LayoutDashboard },
@@ -27,7 +26,6 @@ const companyLinks = [
 export default function CompanyNav() {
   const pathname = usePathname();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
 
   return (
     <>
@@ -80,13 +78,13 @@ export default function CompanyNav() {
               <kbd className="px-1.5 py-0.5 bg-white/10 text-[10px] text-white/70 font-mono">⌘K</kbd>
             </button>
 
-            <button
-              onClick={() => setIsCreateDrawerOpen(true)}
+            <Link
+              href="/company/roles/create"
               className="px-4 py-2 bg-primary text-black font-bold uppercase hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
             >
               <Plus className="w-3.5 h-3.5 stroke-[3]" />
               <span>+ CREATE ROLE</span>
-            </button>
+            </Link>
 
             <Link
               href="/company/settings"
@@ -105,12 +103,6 @@ export default function CompanyNav() {
       </header>
 
       <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-
-      <CreateRoleDrawer
-        isOpen={isCreateDrawerOpen}
-        onClose={() => setIsCreateDrawerOpen(false)}
-        onSave={() => {}}
-      />
     </>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { AgentSessionState, ReasoningItem, CommandExecutionItem, AssistantMessageItem } from '@/components/assistant-ui/types';
-import { API_BASE_URL } from '@/data/apiClient';
+import { API_BASE_URL, fetchCandidateTrace } from '@/data/apiClient';
 
 const BACKEND_BASE = API_BASE_URL;
 
@@ -10,25 +10,31 @@ export function useAgentEvaluation() {
   const [sessionState, setSessionState] = useState<AgentSessionState | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [trace, setTrace] = useState<any | null>(null);
+  const [traceLoading, setTraceLoading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const loadExistingReport = useCallback(async (sessionId: string, candidateName: string, roleTitle: string) => {
+    setTraceLoading(true);
     try {
-      const res = await fetch(`${BACKEND_BASE}/api/reports/${sessionId}`);
-      if (!res.ok) {
-        return false;
-      }
-      const markdown = await res.text();
+      const [reportResult, traceResult] = await Promise.allSettled([
+        fetch(`${BACKEND_BASE}/api/reports/${sessionId}`),
+        fetchCandidateTrace(sessionId),
+      ]);
+      const response = reportResult.status === 'fulfilled' ? reportResult.value : null;
+      const markdown = response?.ok ? await response.text() : '';
+      if (traceResult.status === 'fulfilled') setTrace(traceResult.value);
+      if (!response?.ok && traceResult.status === 'rejected') return false;
 
       setSessionState({
         sessionId,
         status: 'idle',
         environment: {
           id: 'env_docker_sandbox',
-          status: 'connected',
+          status: 'ready',
           path: '/workspace',
         },
-        model: 'gpt-5.6-luna',
+        model: 'managed Agents API',
         reasoningEffort: 'low',
         turns: [
           {
@@ -40,17 +46,17 @@ export function useAgentEvaluation() {
                 id: 'msg-audit-complete',
                 type: 'message',
                 role: 'assistant',
-                content: `### Candidate Repository Audit Record\n\nVerified intelligence report is published and available for review in the **REPORT** tab.\n\nYou can click **Run Live Agent Evaluation** above to initiate a fresh live evaluation stream against \`/api/agents/evaluate\`.`,
+                content: `### Candidate Repository Inspection Record\n\nThe Markdown inspection report is published and available in the **REPORT** tab.\n\nThe activity view is populated from the managed Agents API session when trace export is available.`,
                 timestamp: new Date().toISOString(),
               },
             ],
           },
         ],
         usage: {
-          inputTokens: 2400,
-          reasoningTokens: 540,
-          outputTokens: 1180,
-          totalTokens: 4120,
+          inputTokens: 0,
+          reasoningTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
         },
         reportMarkdown: markdown,
         reportDownloadUrl: `${BACKEND_BASE}/api/reports/${sessionId}`,
@@ -60,6 +66,8 @@ export function useAgentEvaluation() {
     } catch (err: any) {
       console.warn('[useAgentEvaluation] No pre-existing report found:', err?.message);
       return false;
+    } finally {
+      setTraceLoading(false);
     }
   }, []);
 
@@ -72,18 +80,19 @@ export function useAgentEvaluation() {
 
     setIsStreaming(true);
     setError(null);
+    setTrace(null);
 
-    const initialSessionId = `sess_${Date.now().toString(16)}`;
+    const initialSessionId = 'pending-session';
 
     setSessionState({
       sessionId: initialSessionId,
       status: 'in_progress',
       environment: {
         id: 'env_docker_sandbox',
-        status: 'connected',
+          status: 'pending',
         path: '/workspace',
       },
-      model: 'gpt-5.6-luna',
+        model: 'managed Agents API',
       reasoningEffort: 'low',
       turns: [
         {
@@ -169,7 +178,7 @@ export function useAgentEvaluation() {
           if (eventType === 'agent.session.created') {
             const sid = eventData.session_id || eventData.session?.id || targetSessionId;
             targetSessionId = sid;
-            const modelName = eventData.session?.model || 'gpt-5.6-luna';
+            const modelName = eventData.session?.model || 'managed Agents API';
 
             setSessionState((prev) => {
               if (!prev) return prev;
@@ -184,6 +193,8 @@ export function useAgentEvaluation() {
                 },
               };
             });
+            setTraceLoading(true);
+            fetchCandidateTrace(sid).then(setTrace).catch(() => undefined).finally(() => setTraceLoading(false));
           } else if (eventType.includes('reasoning.delta') || (eventData.delta && eventType.includes('reasoning'))) {
             const deltaText = eventData.delta || eventData.text || '';
             setSessionState((prev) => {
@@ -339,6 +350,8 @@ export function useAgentEvaluation() {
           } else if (eventType === 'agent.artifact.ready') {
             const sid = eventData.session_id || targetSessionId;
             const downloadUrl = `${BACKEND_BASE}${eventData.download_url || `/api/reports/${sid}`}`;
+            setTraceLoading(true);
+            fetchCandidateTrace(sid).then(setTrace).catch(() => undefined).finally(() => setTraceLoading(false));
 
             if (eventData.content) {
               setSessionState((prev) => {
@@ -399,6 +412,8 @@ export function useAgentEvaluation() {
     sessionState,
     isStreaming,
     error,
+    trace,
+    traceLoading,
     startEvaluation,
     loadExistingReport,
   };

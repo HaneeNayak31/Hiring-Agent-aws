@@ -133,7 +133,7 @@ export default function TalentRegistryPage() {
                   <div className="col-span-2 font-mono">
                     <span
                       className={`px-2 py-0.5 text-[10px] font-bold uppercase border ${
-                        cand.status === 'VERIFIED'
+                        cand.status === 'INSPECTED'
                           ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
                           : 'border-amber-500/40 text-amber-400 bg-amber-500/10'
                       }`}
@@ -142,8 +142,8 @@ export default function TalentRegistryPage() {
                     </span>
                   </div>
 
-                  <div className="col-span-1 font-mono">
-                    <span className="font-bold text-emerald-400">{cand.evidenceCoverage}%</span>
+                  <div className="col-span-1 font-mono text-[10px] text-white/50 uppercase">
+                    {cand.status === 'INSPECTED' ? 'REPORT READY' : 'PENDING'}
                   </div>
 
                   <div className="col-span-2 text-right">

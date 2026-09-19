@@ -1,6 +1,0 @@
-{
-  "name": "git-forensics-evaluator",
-  "version": "1.0.0",
-  "description": "Evaluate repository Git history and development practices.",
-  "skills": "./skills/"
-}

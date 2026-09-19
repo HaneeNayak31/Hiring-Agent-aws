@@ -39,7 +39,7 @@ export default function ReportQuickView({
     { title: '4. Security & Hygiene', id: '4-security-secrets-and-dependency-hygiene' },
     { title: '5. Evidence Strengths', id: '5-strengths-supported-by-evidence' },
     { title: '6. Interview Questions', id: '6-tailored-interview-questions' },
-    { title: 'Hiring Recommendation', id: 'hiring-recommendation' },
+    { title: 'Limitations', id: 'missing-or-unverified-evidence' },
   ];
 
   const renderFormattedMarkdown = (content: string) => {

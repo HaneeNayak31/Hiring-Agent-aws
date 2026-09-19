@@ -49,6 +49,7 @@ export default function CreateRolePage() {
   const [fullDescription, setFullDescription] = useState(
     '## About The Role\nWe are looking for an exceptional engineer to lead architectural design on our high-concurrency cloud platform. You will work closely with AI infrastructure teams to optimize low-latency APIs and event streaming pipelines.\n\n## Core Impact\n- Scale microservices handling high event volumes.\n- Drive robust automated testing and CI/CD pipelines.\n- Lead incident reviews and architectural design proposals.'
   );
+  const [evaluationGuidance, setEvaluationGuidance] = useState('');
 
   // Dynamic lists
   const [responsibilities, setResponsibilities] = useState<string[]>([
@@ -229,6 +230,7 @@ export default function CreateRolePage() {
       mcp_endpoint: `mcp.stripe.com/hiring/${generatedId}`,
       overview: overview.trim(),
       full_description_markdown: fullDescription.trim(),
+      evaluation_guidance: evaluationGuidance.trim(),
       responsibilities,
       required_skills: requiredSkills,
       preferred_skills: preferredSkills,
@@ -400,6 +402,26 @@ export default function CreateRolePage() {
                 />
               </div>
             </div>
+          </div>
+
+          <div className="border border-white/15 bg-white/[0.02] p-8">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10 font-mono text-xs text-primary font-bold uppercase tracking-wider">
+              <FileText className="w-4 h-4" />
+              <span>Repository Inspection Guidance (Optional)</span>
+            </div>
+            <label className="block text-white/60 mb-2 font-mono text-xs uppercase tracking-wider">
+              Tell the code-inspection agent what the recruiter wants examined
+            </label>
+            <textarea
+              rows={5}
+              value={evaluationGuidance}
+              onChange={(e) => setEvaluationGuidance(e.target.value)}
+              placeholder="Example: Focus on API design, data validation, test coverage, and deployment configuration. Do not evaluate frontend styling."
+              className="w-full bg-black border border-white/20 px-3 py-2 text-white focus:outline-none focus:border-primary font-mono text-xs"
+            />
+            <p className="mt-2 text-[11px] text-white/40 font-mono">
+              This guides repository inspection only. It does not create scores or hiring recommendations.
+            </p>
           </div>
 
           {/* ========================================================================= */}

@@ -1,6 +1,0 @@
-{
-  "name": "security-and-code-smells",
-  "version": "1.0.0",
-  "description": "Evaluate source code for security issues and code smells.",
-  "skills": "./skills/"
-}

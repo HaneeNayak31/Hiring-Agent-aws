@@ -245,6 +245,7 @@ def create_job(job_data: Dict[str, Any] = Body(...)):
         "responsibilities": job_data.get("responsibilities") or ["Architect modular platform services."],
         "required_skills": job_data.get("required_skills") or ["Python", "TypeScript"],
         "preferred_skills": job_data.get("preferred_skills") or [],
+        "evaluation_guidance": job_data.get("evaluation_guidance") or "",
         "benefits": job_data.get("benefits") or ["Competitive salary + equity", "Remote flexibility"],
         "submission_requirements": job_data.get("submission_requirements") or {
             "mandatory_fields": ["fullName", "email", "skills", "projects", "repositoryUrl"],
@@ -486,8 +487,6 @@ def create_application(payload: Dict[str, Any] = Body(...)):
         "custom_answers": payload.get("custom_answers", {}),
         "confirmed_by_candidate": True,
         "status": "SUBMITTED_PENDING_SANDBOX",
-        "readiness_tier": "PENDING",
-        "readiness_score_pct": 0,
         "submitted_at": now_iso,
         "verification_pipeline": {
             "queued_at": now_iso,
@@ -567,16 +566,20 @@ def get_candidate_report(identifier: str):
 @app.get("/api/traces/{identifier}")
 def get_execution_trace(identifier: str):
     """
-    Retrieves full dual-layer flight recorder trace JSON from S3 or local storage fallback.
+    Retrieves the exported OTLP trace JSON from S3 or local storage fallback.
     Accepts either 'application_id' OR 'session_id'.
     """
     storage_identifier = _resolve_artifact_identifier(identifier)
 
     # 1. Try S3
     s3_keys = [
+        f"applications/{storage_identifier}/session_trace.otlp.json",
+        f"reports/{storage_identifier}/session_trace.otlp.json",
+        f"{storage_identifier}/session_trace.otlp.json",
+        # Legacy key retained for previously stored traces.
         f"applications/{storage_identifier}/trace.json",
         f"reports/{storage_identifier}/trace.json",
-        f"{storage_identifier}/trace.json"
+        f"{storage_identifier}/trace.json",
     ]
     s3 = _get_s3_client()
     for s3_key in s3_keys:
@@ -593,9 +596,10 @@ def get_execution_trace(identifier: str):
         LOCAL_REPORTS_DIR,
     ]
     for d in local_dirs:
-        candidate_file = d / "trace.json"
-        if candidate_file.exists():
-            return JSONResponse(content=json.loads(candidate_file.read_text(encoding="utf-8")))
+        for filename in ("session_trace.otlp.json", "trace.json"):
+            candidate_file = d / filename
+            if candidate_file.exists():
+                return JSONResponse(content=json.loads(candidate_file.read_text(encoding="utf-8")))
 
     # Never fabricate an execution history when no trace exists.
     raise HTTPException(status_code=404, detail="Execution trace is not available yet.")
@@ -650,8 +654,17 @@ async def evaluate_agent_stream(payload: Dict[str, Any] = Body(...)):
         # 5. Run test command
         yield f"data: {json.dumps({'type': 'command_execution.completed', 'command': 'npm test -- --coverage', 'cwd': '/workspace/repo', 'output': 'Test Suites: 4 passed, 4 total\nTests: 28 passed, 28 total\nCode Coverage: 92.4%', 'exit_code': 0, 'status': 'completed'})}\n\n"
 
-        # 6. Report completed
-        report_preview = f"# Candidate Evaluation Report\n\n**Recommendation: STRONG HIRE**\n\nVerified code quality, automated test rigor, and clean architecture for `{repo_url}`."
+        # 6. Report completed. This compatibility SSE bridge is intentionally neutral;
+        # durable evaluations are produced by the DynamoDB-triggered evaluator.
+        report_preview = (
+            "# Candidate Repository Inspection Report\n\n"
+            "## Scope\n\n"
+            f"Repository inspected: `{repo_url}`.\n\n"
+            "## Status\n\n"
+            "This live preview stream completed. Open the published Markdown report for the full evidence-backed inspection.\n\n"
+            "## Missing or Unverified Evidence\n\n"
+            "The preview stream does not replace the durable repository inspection workflow."
+        )
         yield f"data: {json.dumps({'type': 'agent.artifact.ready', 'session_id': session_id, 'filename': 'candidate_intelligence_report.md', 'content': report_preview})}\n\n"
         yield f"data: {json.dumps({'type': 'agent.session.turn.completed', 'session_id': session_id, 'turn_id': 'turn-final'})}\n\n"
 
