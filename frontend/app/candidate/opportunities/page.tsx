@@ -63,7 +63,7 @@ export default function OpportunitiesPage() {
         <div className="border-b border-white/15 pb-8 mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <span className="font-mono text-xs text-primary uppercase tracking-widest block mb-2">
-              // Autonomous Matching Engine
+              // Transparent Opportunities
             </span>
             <h1 className="font-bold text-4xl md:text-6xl tracking-tighter uppercase">
               OPPORTUNITIES
@@ -138,7 +138,7 @@ export default function OpportunitiesPage() {
               <p className="text-white/50 text-xs max-w-md mx-auto mb-6">
                 {apiError
                   ? 'Unable to communicate with the opportunities discovery service. Please verify your connection.'
-                  : 'No active job requisitions were found in the database. When the company creates a role, candidate agents discover it automatically.'}
+                  : 'No active job requisitions were found in the database.'}
               </p>
               {searchTerm && (
                 <button

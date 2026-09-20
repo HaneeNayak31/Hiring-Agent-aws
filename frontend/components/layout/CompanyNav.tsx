@@ -36,7 +36,10 @@ export default function CompanyNav() {
               <span className="px-2 py-0.5 bg-primary text-black font-mono text-xs font-bold">
                 AGENTIC
               </span>
-              <span className="font-mono text-xs text-white/50 group-hover:text-white transition-colors uppercase hidden sm:inline">
+              <span className="px-1.5 py-0.5 border border-white/20 bg-white/5 text-[9px] text-white/70 uppercase tracking-widest hidden md:inline">
+                Demo Workspace
+              </span>
+              <span className="font-mono text-xs text-white/50 group-hover:text-white transition-colors uppercase hidden lg:inline">
                 // HIRING CONTROL ROOM
               </span>
             </Link>

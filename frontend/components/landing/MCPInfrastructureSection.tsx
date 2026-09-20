@@ -11,15 +11,15 @@ export default function MCPInfrastructureSection() {
       <div className="max-w-6xl mx-auto">
         <div className="mb-16">
           <span className="font-mono text-xs text-primary uppercase tracking-widest block mb-3 font-bold">
-            // Developer Protocol Layer
+            // Serverless AWS Infrastructure
           </span>
           <h2 className="font-bold text-4xl md:text-6xl tracking-tighter uppercase leading-none mb-6">
             YOUR JOBS. YOUR RULES.
             <br />
-            <span className="text-primary">AGENT-ACCESSIBLE.</span>
+            <span className="text-primary">EVIDENCE BACKED.</span>
           </h2>
           <p className="text-white/70 text-lg font-sans max-w-2xl">
-            Expose standardized Model Context Protocol (MCP) endpoints so external AI assistants can query open requisitions, fetch criteria, and submit verified candidate reports.
+            Expose standardized Model Context Protocol (MCP) endpoints via API Gateway and Lambda. External AI assistants query DynamoDB for open requisitions and submit verified candidate reports. Evaluation artifacts are stored securely in S3.
           </p>
         </div>
 

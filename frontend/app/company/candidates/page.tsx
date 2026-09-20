@@ -8,14 +8,14 @@ import { fetchApplications, ApiError } from '@/data/apiClient';
 import { mapApplicationToCandidateReport } from '@/data/schemaAdapter';
 import { Search, ShieldCheck } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
-import CandidateAgentDrawer from '@/components/company/CandidateAgentDrawer';
+import { useRouter } from 'next/navigation';
 
 export default function TalentRegistryPage() {
   const [candidatesList, setCandidatesList] = useState<CandidateReport[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<ApiError | string | null>(null);
-  const [selectedDrawerCandidate, setSelectedDrawerCandidate] = useState<CandidateReport | null>(null);
+  const router = useRouter();
 
   const loadApps = useCallback(async () => {
     setLoading(true);
@@ -116,7 +116,7 @@ export default function TalentRegistryPage() {
               {candidates.map((cand) => (
                 <div
                   key={cand.id}
-                  onClick={() => setSelectedDrawerCandidate(cand)}
+                  onClick={() => router.push(`/company/candidates/${cand.id}`)}
                   className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-white/[0.03] transition-colors cursor-pointer group"
                 >
                   <div className="col-span-4">
@@ -142,14 +142,19 @@ export default function TalentRegistryPage() {
                     </span>
                   </div>
 
-                  <div className="col-span-1 font-mono text-[10px] text-white/50 uppercase">
-                    {cand.status === 'INSPECTED' ? 'REPORT READY' : 'PENDING'}
+                  <div className="col-span-1 font-mono text-[10px] text-white/50 uppercase flex flex-col items-start gap-1">
+                    {cand.status === 'INSPECTED' ? (
+                      <>
+                        <span className="text-emerald-400 font-bold">REPORT READY</span>
+                        <span className="text-primary font-bold text-[9px] border border-primary/40 px-1.5 py-0.5 bg-primary/10">HUMAN REVIEW REQ</span>
+                      </>
+                    ) : 'PENDING'}
                   </div>
 
                   <div className="col-span-2 text-right">
                     <span className="px-3 py-1.5 bg-primary/10 border border-primary/40 text-primary hover:bg-primary hover:text-black font-mono text-[11px] font-bold uppercase transition inline-flex items-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(255,106,0,0.4)]">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      AGENT CHAT →
+                      VIEW DOSSIER →
                     </span>
                   </div>
                 </div>
@@ -158,12 +163,6 @@ export default function TalentRegistryPage() {
           )}
         </div>
       </main>
-
-      <CandidateAgentDrawer
-        candidate={selectedDrawerCandidate}
-        isOpen={!!selectedDrawerCandidate}
-        onClose={() => setSelectedDrawerCandidate(null)}
-      />
     </div>
   );
 }

@@ -15,8 +15,8 @@ const todaySteps = [
 const futureSteps = [
   { text: 'Code Repository & Passport', detail: 'Candidates apply directly or delegate to AI agents via MCP' },
   { text: 'Standardized Hiring Protocol', detail: 'Company requisitions exposed with explicit technical rubrics' },
-  { text: 'Multi-Agent Code Forensics', detail: 'AWS Lambda runs git timeline, commit integrity & SOLID audits' },
-  { text: 'OpenTelemetry Flight Recorder', detail: 'Real-time OTLP span trees capture execution & token metrics' },
+  { text: 'Serverless Repository Forensics', detail: 'AWS Lambda runs git timeline, commit integrity & test-rigor audits' },
+  { text: 'Transparent Evidence Generation', detail: 'Real-time trace storage verifies the evaluation pipeline' },
   { text: 'Recruiter Intelligence Dossier', detail: 'Automated evidence graph with targeted interview probe questions' },
 ];
 
@@ -31,7 +31,7 @@ export default function ProblemSection() {
           <h2 className="font-bold text-4xl md:text-6xl tracking-tighter uppercase leading-none">
             HIRING IS BROKEN FOR HUMANS.
             <br />
-            <span className="text-black/40">BUILT FOR AGENTS.</span>
+            <span className="text-black/40">FIXED BY EVIDENCE.</span>
           </h2>
         </div>
 
@@ -82,7 +82,7 @@ export default function ProblemSection() {
           >
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/20">
               <span className="font-mono text-xs uppercase tracking-widest text-primary">
-                02 — Agentic Infrastructure
+                02 — Evidence-First Infrastructure
               </span>
               <span className="px-2 py-1 bg-primary text-black font-mono text-xs uppercase tracking-wider font-bold">
                 Zero Friction
@@ -106,7 +106,7 @@ export default function ProblemSection() {
             </div>
 
             <p className="mt-8 pt-6 border-t border-white/20 text-xs text-white/70 font-sans">
-              Candidates never fill forms. AI agents talk directly to hiring protocols and deliver verified proof.
+              Candidates never fill forms. Applications deliver verified repository proof that reduces resume noise and helps recruiters make faster, technically grounded decisions.
             </p>
           </motion.div>
         </div>

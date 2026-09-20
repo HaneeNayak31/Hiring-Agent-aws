@@ -11,7 +11,7 @@ export default function CandidateProfilePage() {
     location: 'Remote',
     profileFitScore: 0,
     evidenceCoverage: 0,
-    bio: 'Connect your GitHub repository and portfolio to allow your delegated AI agent to build a verified evidence profile and apply autonomously.',
+    bio: 'Connect your GitHub repository and portfolio. The platform runs a secure, isolated evaluation in AWS Docker to build a verified evidence profile for your applications.',
     skills: [],
   };
 
@@ -25,7 +25,7 @@ export default function CandidateProfilePage() {
         <div className="border-b border-white/15 pb-8 mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <span className="font-mono text-xs text-primary uppercase tracking-widest block mb-2">
-              // Candidate Identity & Proofs
+              // Candidate Evidence & Proofs
             </span>
             <h1 className="font-bold text-4xl md:text-6xl tracking-tighter uppercase">
               {candidate.name}
@@ -60,7 +60,7 @@ export default function CandidateProfilePage() {
 
           {(candidate.skills || []).length === 0 ? (
             <div className="text-center py-10 text-white/40 text-xs border border-dashed border-white/10">
-              No skill proofs indexed yet. When your agent performs code evaluations, verified competencies will appear here.
+              No skill proofs indexed yet. When you submit an application, the isolated AWS evaluation pipeline will analyze your repository and verified competencies will appear here.
             </div>
           ) : (
             <div className="space-y-8">

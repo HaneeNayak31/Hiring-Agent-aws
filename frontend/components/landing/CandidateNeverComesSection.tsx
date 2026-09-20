@@ -14,15 +14,15 @@ export default function CandidateNeverComesSection() {
       <div className="max-w-6xl mx-auto">
         <div className="mb-16">
           <span className="font-mono text-xs tracking-widest text-primary uppercase block mb-3 font-bold">
-            // Dual-Path Agentic Architecture
+            // Transparent Application Pipelines
           </span>
           <h2 className="font-bold text-4xl md:text-7xl tracking-tighter uppercase leading-[0.95] mb-6">
             DIRECT WEB OR
             <br />
-            <span className="text-primary">AGENT-DELEGATED.</span>
+            <span className="text-primary">AI-ASSISTED.</span>
           </h2>
           <p className="text-black/70 text-lg md:text-xl font-sans max-w-2xl leading-relaxed">
-            Candidates can apply with their GitHub repository in seconds, or delegate job discovery and application entirely to their external AI assistants (ChatGPT, Claude, Gemini) via standardized Model Context Protocol (MCP) endpoints.
+            Candidates can apply with their GitHub repository in seconds, or delegate job discovery and application entirely to their external AI assistants (ChatGPT, Claude, Gemini) via standardized Model Context Protocol (MCP) endpoints. The platform runs a live sandbox evaluation in isolated AWS Docker containers.
           </p>
         </div>
 

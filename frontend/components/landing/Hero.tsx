@@ -16,19 +16,19 @@ export default function Hero() {
         >
           <div className="inline-flex items-center gap-2 font-mono text-xs text-primary uppercase tracking-widest px-3.5 py-1.5 bg-primary/10 border border-primary/30 mb-6 font-bold">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span>AUTONOMOUS MULTI-AGENT HIRING & FORENSICS PLATFORM</span>
+            <span>EVIDENCE-FIRST HIRING INFRASTRUCTURE</span>
           </div>
 
           <h1 className="font-bold text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter uppercase mb-6 leading-[0.92]">
-            AUTONOMOUS
+            VERIFY
             <br />
-            <span className="text-primary">CODE FORENSICS</span>
+            <span className="text-primary">THE WORK</span>
             <br />
-            FOR HIRING.
+            BEHIND THE RESUME.
           </h1>
 
           <p className="text-lg md:text-xl text-white/70 mb-10 max-w-2xl font-sans leading-relaxed">
-            Candidates apply with real code repositories or delegate to personal AI assistants via standardized MCP servers. Autonomous AI agents run deep Git forensics, commit timeline integrity audits, and SOLID architectural evaluations—streaming real-time OpenTelemetry flight recordings to recruiter control rooms.
+            An evidence-first hiring platform that lets candidates apply through their AI assistants and gives recruiters repository-backed technical signals before the interview.
           </p>
 
           <div className="flex flex-wrap gap-4 font-mono text-xs">
@@ -59,16 +59,16 @@ export default function Hero() {
 
           <div className="mt-12 pt-8 border-t border-white/10 grid grid-cols-3 gap-6 font-mono text-xs text-white/50">
             <div>
-              <div className="text-white font-bold text-lg">0ms</div>
-              <div>Trace Availability</div>
+              <div className="text-white font-bold text-lg">AWS Native</div>
+              <div>Serverless Evaluation</div>
             </div>
             <div>
-              <div className="text-emerald-400 font-bold text-lg">Multi-Agent</div>
-              <div>Git & Code Forensics</div>
+              <div className="text-emerald-400 font-bold text-lg">MCP Enabled</div>
+              <div>Agentic Applications</div>
             </div>
             <div>
-              <div className="text-primary font-bold text-lg">OpenTelemetry</div>
-              <div>Full OTLP Traces</div>
+              <div className="text-primary font-bold text-lg">Verified Evidence</div>
+              <div>Repository Forensics</div>
             </div>
           </div>
         </motion.div>

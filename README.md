@@ -1,116 +1,172 @@
-# AI-Native Hiring Platform (AWS SAM Architecture)
+# Agentic - AI-Native Evidence-First Hiring Platform
 
-An evidence-first hiring platform connecting candidate AI agents (Claude, Codex, Cursor) via **Model Context Protocol (MCP)** to an automated **Docker sandbox evaluation agent**, orchestrating reports and execution traces through **AWS SAM (DynamoDB, S3, Lambda)** and a Next.js **Recruiter Flight Recorder UI**.
+An evidence-first hiring platform that lets candidates apply through their AI assistants via Model Context Protocol (MCP) and gives recruiters repository-backed technical signals evaluated in an isolated AWS Docker sandbox.
+
+## The Problem
+
+**Hiring is broken for humans.**
+Resumes are inherently self-reported and increasingly flooded with AI-generated buzzwords, making it nearly impossible for recruiters to verify technical depth before an interview. At the same time, strong candidates spend countless hours battling ATS parsers instead of demonstrating their actual engineering capabilities.
+
+**Why existing workflows fail:**
+Traditional Applicant Tracking Systems (ATS) rely on keyword matching, missing the nuance of real engineering work. They cannot compile an evidence graph of a candidate's actual architecture decisions, Git history, or test rigor. 
+
+## Target Users
+
+- **Technical Recruiters & Hiring Managers:** Need fast, verified signals on a candidate's capabilities to make fair interview decisions.
+- **Software Engineering Candidates:** Want to prove their skills through real repository evidence rather than formatting resumes.
 
 ---
 
-## Repository Structure
+## Product Workflow
 
-```text
-Hiring-Agent-aws/
-│
-├── frontend/                                # Next.js 13 Recruiter & Candidate Portal
-│   ├── app/                                 # Routes (recruiter candidates, brief, opportunities)
-│   ├── components/                          # UI components (evidence graphs, drawer)
-│   ├── data/                                # Mock data & types
-│   ├── package.json
-│   └── tailwind.config.js
-│
-├── serverless_backend/                      # AWS Serverless Application Model (SAM)
-│   ├── template.yaml                        # Infrastructure as Code (DynamoDB, S3, Lambdas)
-│   ├── samconfig.toml                       # SAM deployment settings
-│   ├── evaluator_function/                  # Candidate Evaluator (triggered by DynamoDB Stream)
-│   │   ├── handler.py                       # Lambda entrypoint
-│   │   ├── agent.py                         # OpenAI Agents API session factory
-│   │   ├── trace_collector.py               # Lossless trace recorder
-│   │   ├── s3_storage.py                    # S3 uploader for reports and trace.json
-│   │   ├── prompts/                         # Prompts and system instructions
-│   │   └── requirements.txt
-│   │
-│   └── api_function/                        # Recruiter REST API (FastAPI + Mangum)
-│       ├── app.py                           # /api/reports/{id}, /api/traces/{id}
-│       └── requirements.txt
-│
-├── MCP/                                     # Standalone Applicant MCP Server
-│   ├── server.py                            # FastMCP server with tools & prompts
-│   ├── db.py                                # DynamoDB adapter (Jobs & Applications)
-│   ├── models/                              # Pydantic models (passport, job, application)
-│   ├── scripts/                             # seed_dynamodb.py
-│   ├── tests/                               # Unit & integration tests
-│   └── requirements.txt
-└── package.json                             # Monorepo scripts (dev, build, mcp, sam)
+1. **Role Exposure:** Companies expose hiring requisitions via standardized MCP endpoints running on AWS API Gateway.
+2. **AI-Assisted Application:** Candidates use Claude, Cursor, or Gemini to connect to the MCP server, discover roles, and submit their GitHub repository as evidence.
+3. **AWS Evaluation:** An AWS Lambda workflow securely clones the repository into an isolated Docker sandbox. It evaluates Git forensics, architecture, code smells, and test rigor.
+4. **Recruiter Review:** The system generates a Candidate Intelligence Dossier with a "Human Review Required" label, allowing recruiters to inspect verified evidence and OpenTelemetry traces in a dedicated control room.
+
+---
+
+## Architecture Diagram
+
+```mermaid
+graph TD
+    Candidate[Candidate AI Assistant] -->|MCP Protocol| API[AWS API Gateway]
+    API --> LambdaAPI[Recruiter API Lambda]
+    LambdaAPI --> DB_Apps[(DynamoDB Applications)]
+    
+    DB_Apps -->|DynamoDB Streams| LambdaEval[Evaluator Lambda]
+    LambdaEval --> Docker[Isolated Docker Sandbox]
+    
+    Docker -->|Evaluates Repo| Reports[Evidence Generation]
+    Reports -->|JSON Traces & Markdown| S3[(S3 Artifact Bucket)]
+    
+    S3 --> RecruiterUI[Next.js Recruiter Control Room]
+    DB_Apps --> RecruiterUI
 ```
 
 ---
 
-## Quick Start & Developer Guide
+## AWS Services & Usage
 
-### 1. Run the Frontend (Next.js)
+- **AWS API Gateway:** Hosts the external-facing Model Context Protocol (MCP) server for candidate agents to interact with.
+- **AWS Lambda:** Powers the serverless backend API and the asynchronous evaluator workflow, ensuring isolated scaling per candidate submission.
+- **Amazon DynamoDB:** Stores job requisitions and candidate applications with low-latency access.
+- **DynamoDB Streams:** Triggers the evaluation Lambda automatically upon a new application insert, decoupling submission from processing.
+- **Amazon S3:** Securely stores the generated markdown intelligence reports and OpenTelemetry execution traces.
+- **AWS SAM:** Provisions the entire infrastructure as code, managing permissions and routing.
+
+---
+
+## MCP Tools & Candidate Journey
+
+The platform exposes an MCP server (`https://h6aggmskk4.execute-api.ap-south-1.amazonaws.com/mcp`) with the following tools:
+- `search_jobs`: Query open roles by keyword and requirements.
+- `get_job_requirements`: Retrieve technical rubrics.
+- `apply_to_job`: Submit candidate details and repository URL.
+
+Candidates add the MCP configuration to their AI Assistant, prompting it to find a matching job and submit their GitHub profile. 
+
+---
+
+## Evaluation Dimensions
+
+The Docker sandbox evaluates the submitted repository across four dimensions:
+1. **Git Forensics:** Verifies commit timeline integrity and author divergence.
+2. **SOLID Architecture:** Evaluates separation of concerns and interface design.
+3. **Security & Code Smells:** Scans for hardcoded secrets and unhandled edge cases.
+4. **Test Rigor:** Measures unit testing coverage and assertion quality.
+
+---
+
+## Local Setup & Demo Mode Instructions
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/HaneeNayak31/Hiring-Agent-aws.git
+   cd Hiring-Agent-aws/frontend
+   ```
+
+2. **Install Dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Run the Application:**
+   ```bash
+   npm run dev
+   ```
+
+The application runs at `http://localhost:3000`. By default, the UI utilizes a mock data layer ("Demo Workspace") for immediate presentation and testing without requiring live AWS credentials. 
+
+---
+
+## AWS Deployment
+
+To deploy the backend to your own AWS account:
+
+1. Install the AWS SAM CLI.
+2. Authenticate with your AWS account.
+3. Deploy the backend:
+   ```bash
+   cd serverless_backend
+   sam build
+   sam deploy --guided
+   ```
+
+### Environment Variables
+For the frontend to connect to your deployed backend, set the following in `frontend/.env.local`:
+- `NEXT_PUBLIC_API_URL`: Your deployed API Gateway endpoint.
+- `NEXT_PUBLIC_MCP_URL`: Your MCP server endpoint.
+
+---
+
+## Testing Commands
+
+Run frontend linting and build checks:
 ```bash
 cd frontend
-npm run dev
-# Or from root:
-npm run dev
+npm run lint
+npm run build
 ```
-Accessible at: `http://localhost:3000`
 
----
-
-### 2. Run the Applicant MCP Server
-Candidate AI agents connect to this MCP server to discover jobs and apply:
+Run backend evaluation tests (Requires Python):
 ```bash
-cd MCP
-pip install -r requirements.txt
-python server.py
-# Or from root:
-npm run mcp
+cd serverless_backend
+pytest tests/
 ```
 
 ---
 
-### 3. Deploy the Serverless Backend (AWS SAM)
-Once AWS SAM CLI is installed:
-```bash
-# Build functions & dependencies
-sam build
+## Known Limitations
 
-# Deploy to your AWS Account
-sam deploy --guided
-```
-
-This provisions:
-- **`HiringAgent_Jobs`** DynamoDB table (with GSI `status-posted_at-index`).
-- **`HiringAgent_Applications`** DynamoDB table (with GSI `job_id-submitted_at-index` and **DynamoDB Streams**).
-- **`hiring-agent-assessments-...`** S3 bucket for markdown reports and lossless `trace.json` execution logs.
-- **`CandidateEvaluatorFunction`** Lambda listening to DynamoDB Streams to run the evaluation agent.
-- **`RecruiterApiFunction`** HTTP API for the Recruiter UI.
+- The live Docker sandbox evaluation relies on specific AWS VPC configurations for security, which may require manual tuning depending on repository sizes.
+- Real-time OpenTelemetry streaming to the UI has a slight delay due to S3 artifact batching.
+- The default UI runs in a "Demo Workspace" mode to ensure reliability during presentations.
 
 ---
 
-### 4. Seed DynamoDB Tables (Initial Roles)
-```bash
-python MCP/scripts/seed_dynamodb.py
-# Or from root:
-npm run seed:dynamodb
-```
+## Security & Privacy Considerations
+
+- **Isolated Execution:** Candidate code is evaluated within ephemeral Docker containers without outbound network access.
+- **Human in the Loop:** The AI evaluator does not make hiring decisions. It surfaces evidence and requires explicit human review.
+- **Data Retention:** Evaluation traces are scrubbed of personal identifiers and stored securely in S3 with strict IAM policies.
 
 ---
 
-## Architectural Workflow
+## 3-Minute Demo Script
 
-1. **Candidate Applies via MCP**:
-   * Candidate AI invokes `submit_application` on `MCP/server.py`.
-   * MCP server writes candidate passport to `HiringAgent_Applications` in DynamoDB.
-2. **DynamoDB Stream Fires**:
-   * The `INSERT` stream event triggers `serverless_backend/evaluator_function/handler.py`.
-   * Status updates to `EVALUATING`.
-3. **Sandbox Agent Evaluates Repo**:
-   * Clones repo, runs unit tests, static linting, and architecture analysis.
-   * `TraceCollector` captures 100% of raw events (reasoning tokens, tool calls, stdout/stderr).
-4. **Artifacts Uploaded to S3**:
-   * `candidate_intelligence_report.md` $\rightarrow$ S3.
-   * `trace.json` (dual-layer flight recorder) $\rightarrow$ S3.
-   * DynamoDB status updates to `EVALUATED`.
-5. **Recruiter Reviews Candidate**:
-   * Recruiter views Candidate Detail page.
-   * Inspects AI report, reads actual terminal logs, and audits the AI reasoning timeline.
+- **0:00–0:20 (Problem):** "Resumes are noisy. We built Agentic to verify the work behind the resume. We let candidates apply via their AI assistants and evaluate their code in an AWS Docker sandbox."
+- **0:20–0:45 (Candidate Discovery):** Show the Candidate UI. "A candidate connects their Cursor or Claude agent to our AWS API Gateway via MCP. The agent discovers the 'Senior Software Engineer' role automatically."
+- **0:45–1:15 (Application):** "The agent submits the candidate's GitHub repo. This triggers a DynamoDB stream."
+- **1:15–1:50 (AWS Evaluation):** "AWS Lambda catches the stream, spinning up an isolated Docker container to analyze Git forensics, architecture, and code smells."
+- **1:50–2:35 (Recruiter View):** Open the Recruiter Control Room. "The recruiter doesn't see a resume. They see an evidence-backed intelligence dossier. Notice the 'Human Review Required' label—the AI provides signals, but humans make the call."
+- **2:35–2:55 (Trace/Evidence):** Click into the report to show verified Git forensics and test rigor metrics. 
+- **2:55–3:00 (Close):** "This is evidence-first hiring, powered by AWS Serverless and MCP."
+
+---
+
+## What We Learned
+
+- **Decoupling with DynamoDB Streams:** We learned how powerful DynamoDB Streams are for decoupling fast API submissions (MCP) from heavy backend processing (Sandbox Evaluation).
+- **LLM Context Limitations:** We learned to pipe OpenTelemetry traces into structured JSON rather than feeding raw terminal logs to the frontend, vastly improving UI performance.
+- **UX for AI Actions:** We discovered that recruiters need clear visual distinctions between "AI generated recommendations" and "Verified repository evidence" to trust the system.

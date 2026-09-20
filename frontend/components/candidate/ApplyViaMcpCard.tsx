@@ -273,9 +273,9 @@ export default function ApplyViaMcpCard({ jobId, jobTitle }: ApplyViaMcpCardProp
           <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
           <div className="font-sans text-white/80">
             <strong className="text-white font-mono uppercase tracking-wider block mb-1">
-              Automated AI Evaluator Handshake:
+              Secure AWS Docker Sandbox Evaluation:
             </strong>
-            Once your candidate agent invokes <code className="text-primary font-mono">apply_to_job</code>, the company's AWS Lambda evaluator autonomously analyzes the evidence against the role rubric, records the execution telemetry, and surfaces your profile to the hiring team.
+            Once your candidate agent invokes <code className="text-primary font-mono">apply_to_job</code>, an isolated AWS Lambda workflow orchestrates a Docker container to analyze the evidence. Telemetry is saved to S3 and your verified profile is surfaced to the hiring team.
           </div>
         </div>
       </div>
