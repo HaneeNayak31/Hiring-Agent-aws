@@ -43,7 +43,7 @@ export function CreateRoleModal({ isOpen, onClose, onSave }: CreateRoleModalProp
         agentApplicationsCount: 0,
         inVerificationCount: 0,
         interviewReadyCount: 0,
-        mcpEndpoint: `mcp.stripe.com/hiring/${title.toLowerCase().replace(/\s+/g, '-')}`,
+        mcpEndpoint: 'https://h6aggmskk4.execute-api.ap-south-1.amazonaws.com/mcp',
         mcpExposed: true,
       });
       setIsCreatedSuccess(false);

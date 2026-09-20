@@ -16,7 +16,7 @@ export function mapJobDetailToOpenRole(job: JobRoleDetail): OpenRole {
     agentApplicationsCount: job.applications_count ? Math.floor(job.applications_count * 0.85) : 0,
     inVerificationCount: job.in_verification_count ?? 0,
     interviewReadyCount: job.interview_ready_count ?? 0,
-    mcpEndpoint: job.mcp_endpoint || `mcp.stripe.com/hiring/${job.job_id || job.id}`,
+    mcpEndpoint: job.mcp_endpoint || 'https://h6aggmskk4.execute-api.ap-south-1.amazonaws.com/mcp',
     mcpExposed: job.mcp_exposed ?? true,
     requiredSkills: job.required_skills || job.primary_skills || [],
     preferredSkills: job.preferred_skills || [],

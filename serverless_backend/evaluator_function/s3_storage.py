@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union,List
 import boto3
 from botocore.exceptions import ClientError, BotoCoreError
 from dotenv import load_dotenv
@@ -137,3 +137,132 @@ def get_trace(application_id: str, filename: str = "session_trace.otlp.json") ->
         if local_file.exists():
             return json.loads(local_file.read_text(encoding="utf-8"))
     return None
+
+
+def upload_session_file(
+    application_id: str,
+    filename: str,
+    content: Union[str, bytes],
+    content_type: str = "application/octet-stream"
+) -> str:
+    """
+    Uploads any arbitrary session file (e.g. meta.json, events.jsonl) to S3 under
+    applications/{application_id}/{filename} with local fallback.
+    """
+    if isinstance(content, str):
+        body_bytes = content.encode("utf-8")
+        text_content = content
+    else:
+        body_bytes = content
+        text_content = content.decode("utf-8", errors="replace")
+
+    s3_key = f"applications/{application_id}/{filename}"
+    s3_url = f"s3://{S3_BUCKET}/{s3_key}"
+
+    local_dir = LOCAL_REPORTS_DIR / application_id
+    local_dir.mkdir(parents=True, exist_ok=True)
+    local_file = local_dir / filename
+    local_file.write_text(text_content, encoding="utf-8")
+
+    try:
+        s3 = get_s3_client()
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key=s3_key,
+            Body=body_bytes,
+            ContentType=content_type
+        )
+        print(f"[S3] Uploaded session file {filename} to: {s3_url}", flush=True)
+        return s3_url
+    except Exception as e:
+        print(f"[S3] Notice: S3 upload failed for {filename} ({e}). Saved locally: {local_file}", flush=True)
+        return str(local_file)
+
+
+def upload_session_meta(application_id: str, meta: Dict[str, Any]) -> str:
+    """Uploads session meta.json to S3."""
+    return upload_session_file(
+        application_id=application_id,
+        filename="meta.json",
+        content=json.dumps(meta, indent=2),
+        content_type="application/json"
+    )
+
+
+def upload_session_events(application_id: str, events: Union[str, List[Dict[str, Any]]]) -> str:
+    """Uploads events.jsonl to S3."""
+    if isinstance(events, list):
+        content = "\n".join(json.dumps(e, default=str) for e in events) + "\n"
+    else:
+        content = events
+    return upload_session_file(
+        application_id=application_id,
+        filename="events.jsonl",
+        content=content,
+        content_type="application/x-ndjson"
+    )
+
+
+def get_session_meta(identifier: str) -> Optional[Dict[str, Any]]:
+    """Fetches meta.json from S3 or local storage."""
+    s3 = get_s3_client()
+    for s3_key in [
+        f"applications/{identifier}/meta.json",
+        f"reports/{identifier}/meta.json",
+        f"{identifier}/meta.json"
+    ]:
+        try:
+            res = s3.get_object(Bucket=S3_BUCKET, Key=s3_key)
+            return json.loads(res["Body"].read().decode("utf-8"))
+        except Exception:
+            pass
+
+    for d in [LOCAL_REPORTS_DIR / identifier, LOCAL_REPORTS_DIR]:
+        local_f = d / "meta.json"
+        if local_f.exists():
+            try:
+                return json.loads(local_f.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+    return None
+
+
+def get_session_events(identifier: str) -> Optional[List[Dict[str, Any]]]:
+    """Fetches events.jsonl from S3 or local storage and parses as list of dicts."""
+    s3 = get_s3_client()
+    for s3_key in [
+        f"applications/{identifier}/events.jsonl",
+        f"reports/{identifier}/events.jsonl",
+        f"{identifier}/events.jsonl"
+    ]:
+        try:
+            res = s3.get_object(Bucket=S3_BUCKET, Key=s3_key)
+            raw = res["Body"].read().decode("utf-8")
+            events = []
+            for line in raw.splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        events.append(json.loads(line))
+                    except Exception:
+                        pass
+            if events:
+                return events
+        except Exception:
+            pass
+
+    for d in [LOCAL_REPORTS_DIR / identifier, LOCAL_REPORTS_DIR]:
+        local_f = d / "events.jsonl"
+        if local_f.exists():
+            events = []
+            for line in local_f.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        events.append(json.loads(line))
+                    except Exception:
+                        pass
+            if events:
+                return events
+    return None
+

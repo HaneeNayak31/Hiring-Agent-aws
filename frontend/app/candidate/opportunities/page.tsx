@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { CandidateNav } from '@/components/layout';
 import ApiErrorBanner from '@/components/layout/ApiErrorBanner';
 import { fetchJobs, ApiError } from '@/data/apiClient';
+import ApplyViaMcpCard, { REAL_MCP_URL } from '@/components/candidate/ApplyViaMcpCard';
 
 export default function OpportunitiesPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -31,7 +32,7 @@ export default function OpportunitiesPage() {
           name: s,
           matched: true,
         })),
-        mcpServer: j.mcp_endpoint || `mcp.stripe.com/hiring/${j.job_id || j.id}`,
+        mcpServer: j.mcp_endpoint || REAL_MCP_URL,
       }));
       setJobs(liveJobs);
     } catch (err: any) {
@@ -73,6 +74,9 @@ export default function OpportunitiesPage() {
             SHOWING <span className="text-primary font-bold">{filteredJobs.length}</span> DISCOVERED ROLES
           </div>
         </div>
+
+        {/* Centered Apply as Candidate via MCP Server */}
+        <ApplyViaMcpCard />
 
         <div className="flex flex-col sm:flex-row gap-4 mb-12 font-mono text-xs">
           <div className="relative flex-1">

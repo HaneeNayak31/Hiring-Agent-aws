@@ -46,7 +46,7 @@ export default function RootLayout({
 
           <div className="flex items-center gap-3 font-mono text-xs">
             <Link
-              href="/candidate/opportunities"
+              href="/candidate/apply"
               className="hidden sm:inline-flex px-4 py-2 border border-white/30 text-white font-bold uppercase tracking-wider hover:border-primary hover:text-primary transition"
             >
               Apply as Candidate

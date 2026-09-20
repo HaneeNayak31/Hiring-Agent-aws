@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CandidateNav } from '@/components/layout';
 import ApiErrorBanner from '@/components/layout/ApiErrorBanner';
 import { fetchJob, submitApplication, ApiError } from '@/data/apiClient';
+import ApplyViaMcpCard, { REAL_MCP_URL } from '@/components/candidate/ApplyViaMcpCard';
 
 export default function OpportunityDetailPage() {
   const params = useParams();
@@ -47,7 +48,7 @@ export default function OpportunityDetailPage() {
             strength: 95,
             matched: true,
           })),
-          mcpServer: liveJob.mcp_endpoint || `mcp.stripe.com/hiring/${liveJob.job_id || liveJob.id}`,
+          mcpServer: liveJob.mcp_endpoint || REAL_MCP_URL,
         });
       } else {
         setNotFound(true);
@@ -223,6 +224,9 @@ export default function OpportunityDetailPage() {
           </div>
         </div>
 
+        {/* Centered Real MCP Application Card with Copy Button and Instructions */}
+        <ApplyViaMcpCard jobId={job.id} jobTitle={job.title} />
+
         <div className="grid lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-10">
             <div className="border border-white/15 bg-white/[0.01] p-8">
@@ -291,9 +295,9 @@ export default function OpportunityDetailPage() {
                 <div>PROTOCOL: <span className="text-emerald-400">v1.4 ACTIVE</span></div>
                 <div>AVAILABLE TOOLS:</div>
                 <div className="bg-black border border-white/10 p-3 space-y-1 font-mono text-[11px] text-primary">
-                  <div>· search_jobs</div>
-                  <div>· get_requirements</div>
-                  <div>· verify_evidence</div>
+                  <div>· list_open_jobs</div>
+                  <div>· get_job_requirements</div>
+                  <div>· verify_candidate_evidence</div>
                   <div>· apply_to_job</div>
                 </div>
               </div>

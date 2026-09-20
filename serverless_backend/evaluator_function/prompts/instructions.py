@@ -50,7 +50,7 @@ def create_input(
     repositories: list[dict] | None = None,
     job_context: dict | None = None,
 ) -> str:
-    """Generate a coordinator prompt for multi-repository code inspection and HR-ready dossier generation."""
+    """Generate an evaluation prompt for direct repository code inspection and HR-ready dossier generation."""
     repo_entries = repositories or [{"repository_id": "project-1", "repository_url": repo_url}]
     repo_lines = "\n".join(
         f"- {item.get('repository_id', 'repository')}: {item.get('repository_url', '')}"
@@ -70,7 +70,7 @@ def create_input(
     )
 
     return f"""
-You are the lead technical evaluation coordinator. Audit every repository listed below by delegating each repository to an inspector subagent.
+You are the lead technical evaluation agent. Directly audit and inspect every repository listed below in this single agent session. Do not spawn subagents. Perform all repository cloning, forensic inspection, test analysis, and report generation directly yourself.
 
 Target Role:
 {role_title}
@@ -84,10 +84,16 @@ Recruiter Guidance:
 Repositories to Inspect:
 {repo_lines}
 
-Follow these execution phases:
-1. Delegate each repository to a separate subagent to clone into `/workspace/repos/<repository_id>`.
-2. Inspect architecture, code cleanliness, test rigor, security, Git cadence, and deployment infrastructure.
-3. Collect all findings and compile a comprehensive, executive-ready Candidate Intelligence Dossier.
+Follow these execution phases directly:
+1. Clone each repository into `/workspace/repos/<repository_id>` (or `/workspace/repo` if only one repository).
+2. Directly inspect directory structure, architecture, code cleanliness, test rigor, security, Git cadence, and deployment infrastructure.
+3. Apply your forensic evaluation skills:
+   - Git Forensics (commit cadence, authorship proportion, organic commits vs monolithic dumps)
+   - SOLID Architecture & Modularity (layering, decoupling, separation of concerns)
+   - Test Suite Rigor (test discovery, assertion strength, mock fidelity, boundary conditions)
+   - Security & Code Smells (secret leakage, bare exceptions, injection hazards)
+   - Interview Question Formulation (grounded technical questions with evaluation rubrics)
+4. Compile all findings and write the comprehensive, executive-ready Candidate Intelligence Dossier.
 
 The Markdown report written to `/workspace/outputs/candidate_intelligence_report.md` MUST follow this exact structure:
 

@@ -227,7 +227,7 @@ export default function CreateRolePage() {
       primary_skills: primarySkills,
       status: 'active',
       mcp_exposed: mcpExposed,
-      mcp_endpoint: `mcp.stripe.com/hiring/${generatedId}`,
+      mcp_endpoint: 'https://h6aggmskk4.execute-api.ap-south-1.amazonaws.com/mcp',
       overview: overview.trim(),
       full_description_markdown: fullDescription.trim(),
       evaluation_guidance: evaluationGuidance.trim(),
@@ -858,7 +858,7 @@ export default function CreateRolePage() {
               <div className="p-4 bg-black border border-white/15">
                 <span className="text-white/50 block text-[10px] uppercase mb-1">MCP Endpoint URL Preview</span>
                 <span className="font-mono text-primary font-bold text-sm break-all">
-                  mcp.stripe.com/hiring/{title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24) : 'requisition-id'}
+                  https://h6aggmskk4.execute-api.ap-south-1.amazonaws.com/mcp
                 </span>
                 <p className="text-white/40 text-[11px] mt-2 leading-normal">
                   External agents query this unique identifier via <code className="text-white">list_open_jobs</code> and <code className="text-white">get_job_requirements</code>.

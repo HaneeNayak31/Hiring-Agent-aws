@@ -72,7 +72,7 @@ export default function CompanySettingsPage() {
                 <label className="block text-white/50 mb-2 uppercase">MCP Server Endpoint URL</label>
                 <input
                   type="text"
-                  defaultValue="https://mcp.stripe.com/hiring"
+                  defaultValue="https://h6aggmskk4.execute-api.ap-south-1.amazonaws.com/mcp"
                   className="w-full bg-white/[0.03] border border-white/20 p-3 text-white focus:outline-none focus:border-primary"
                 />
               </div>

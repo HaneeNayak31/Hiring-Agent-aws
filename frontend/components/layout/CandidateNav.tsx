@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Briefcase, FileCheck, Activity, User } from 'lucide-react';
+import { LayoutDashboard, Briefcase, FileCheck, Activity, User, Server } from 'lucide-react';
 
 const links = [
+  { href: '/candidate/apply', label: 'Apply (MCP)', icon: Server },
   { href: '/candidate/opportunities', label: 'Opportunities', icon: Briefcase },
   { href: '/candidate/applications', label: 'Applications', icon: FileCheck },
   { href: '/candidate/activity', label: 'Agent Activity', icon: Activity },

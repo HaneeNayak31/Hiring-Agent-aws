@@ -88,7 +88,7 @@ export default function CandidateNeverComesSection() {
 
           <div className="border border-white/30 bg-white/10 p-6 text-center max-w-xl mx-auto mb-8">
             <div className="text-xs text-primary font-bold uppercase mb-1">COMPANY HIRING MCP SERVER</div>
-            <div className="text-sm font-bold text-white font-mono">mcp.company.example/hiring</div>
+            <div className="text-sm font-bold text-white font-mono break-all">https://h6aggmskk4.execute-api.ap-south-1.amazonaws.com/mcp</div>
             <div className="text-[11px] text-white/60 font-sans mt-2">
               Exposes capability endpoints: search_jobs, get_job_requirements, apply_to_job
             </div>

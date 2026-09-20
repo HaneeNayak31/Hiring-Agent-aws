@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Terminal, Code, Activity, Loader2 } from 'lucide-react';
+import { Terminal, Code, Activity, Loader2, Copy, Check, Server, ExternalLink } from 'lucide-react';
 import { CompanyNav, Breadcrumbs } from '@/components/layout';
 import ApiErrorBanner from '@/components/layout/ApiErrorBanner';
 import { mockMCPTools, mockMCPLogs, MCPTool, OpenRole } from '@/data/mockData';
 import { fetchJobs, fetchApplications, ApiError } from '@/data/apiClient';
 import { mapJobDetailToOpenRole } from '@/data/schemaAdapter';
 import Link from 'next/link';
+import { useState, useEffect, useCallback } from 'react';
+// import { Terminal, Code, Activity, Loader2 } from 'lucide-react';
+const REAL_MCP_URL = 'https://h6aggmskk4.execute-api.ap-south-1.amazonaws.com/mcp';
 
 export default function InfrastructureMCPPage() {
   const [selectedTool, setSelectedTool] = useState<MCPTool>(mockMCPTools[0]);
@@ -15,6 +17,7 @@ export default function InfrastructureMCPPage() {
   const [applicationsCount, setApplicationsCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<ApiError | string | null>(null);
+  const [copiedEndpoint, setCopiedEndpoint] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -92,6 +95,51 @@ export default function InfrastructureMCPPage() {
           </div>
         </div>
 
+        {/* Live MCP Gateway Endpoint Display & Copy */}
+        <div className="border-2 border-primary/50 bg-gradient-to-r from-primary/10 via-black to-black p-6 mb-10 font-mono text-xs shadow-[6px_6px_0px_0px_rgba(255,106,0,1)]">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-primary font-bold uppercase text-[11px] mb-1">
+                <Server className="w-4 h-4 text-emerald-400" />
+                <span>PRIMARY PRODUCTION MCP GATEWAY ENDPOINT</span>
+              </div>
+              <a
+                href={REAL_MCP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm md:text-base font-bold text-white hover:text-primary transition break-all inline-flex items-center gap-1.5"
+              >
+                <span>{REAL_MCP_URL}</span>
+                <ExternalLink className="w-3.5 h-3.5 text-white/50" />
+              </a>
+            </div>
+
+            <button
+              onClick={() => {
+                navigator?.clipboard?.writeText(REAL_MCP_URL);
+                setCopiedEndpoint(true);
+                setTimeout(() => setCopiedEndpoint(false), 2000);
+              }}
+              className={`px-6 py-3 font-bold uppercase text-xs tracking-wider transition flex items-center justify-center gap-2 shrink-0 ${copiedEndpoint
+                ? 'bg-emerald-400 text-black'
+                : 'bg-primary text-black hover:bg-primary/90'
+                }`}
+            >
+              {copiedEndpoint ? (
+                <>
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>COPIED!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  <span>COPY MCP URL</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
         <div className="border border-white/15 bg-black p-8 font-mono text-xs mb-12">
           <h2 className="font-bold text-sm uppercase text-white mb-4 pb-3 border-b border-white/10">
             // EXPOSED HIRING REQUISITION ENDPOINTS
@@ -146,11 +194,10 @@ export default function InfrastructureMCPPage() {
                 <button
                   key={tool.name}
                   onClick={() => setSelectedTool(tool)}
-                  className={`p-4 border text-left transition-all ${
-                    isSelected
-                      ? 'border-primary bg-primary text-black font-bold shadow-[0_0_15px_rgba(255,106,0,0.3)]'
-                      : 'border-white/20 bg-white/[0.02] text-white hover:border-white/50'
-                  }`}
+                  className={`p-4 border text-left transition-all ${isSelected
+                    ? 'border-primary bg-primary text-black font-bold shadow-[0_0_15px_rgba(255,106,0,0.3)]'
+                    : 'border-white/20 bg-white/[0.02] text-white hover:border-white/50'
+                    }`}
                 >
                   <div className="text-xs uppercase mb-1.5 font-mono font-bold tracking-tight">{tool.name}</div>
                   <div className="flex items-center gap-1.5 text-[10px]">

@@ -166,13 +166,7 @@ def create_agent_session(
             "reasoning": {
                 "effort": "low",
                 "summary": "auto",
-            },
-            "multi_agent": {
-                "enabled": True,
-                "max_concurrent_subagents": max(
-                    1, min(int(os.getenv("MAX_CONCURRENT_SUBAGENTS", "3")), 3)
-                ),
-            },
+            }
         },
         environment={
             "type": "openai_hosted",

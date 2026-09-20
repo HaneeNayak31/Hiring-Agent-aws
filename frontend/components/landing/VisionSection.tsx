@@ -4,9 +4,9 @@ import { motion } from 'framer-motion';
 import { Cpu, Server, ShieldCheck, Zap } from 'lucide-react';
 
 const companies = [
-  { name: 'STRIPE', role: 'Staff Infrastructure', fit: '96%', mcp: 'mcp.stripe.com/hiring' },
-  { name: 'VERCEL', role: 'Senior Systems Engineer', fit: '92%', mcp: 'mcp.vercel.com/jobs' },
-  { name: 'LINEAR', role: 'Frontend Architect', fit: '89%', mcp: 'mcp.linear.app/careers' },
+  { name: 'PRODUCTION', role: 'Staff Infrastructure', fit: '96%', mcp: 'https://h6aggmskk4.execute-api.ap-south-1.amazonaws.com/mcp' },
+  { name: 'AWS HIRING', role: 'Senior Systems Engineer', fit: '92%', mcp: 'https://h6aggmskk4.execute-api.ap-south-1.amazonaws.com/mcp' },
+  { name: 'ENTERPRISE', role: 'Frontend Architect', fit: '89%', mcp: 'https://h6aggmskk4.execute-api.ap-south-1.amazonaws.com/mcp' },
 ];
 
 export default function VisionSection() {

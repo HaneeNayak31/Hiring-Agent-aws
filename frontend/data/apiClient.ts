@@ -260,15 +260,6 @@ export async function fetchCandidateReport(identifier: string): Promise<string> 
   }
 }
 
-export async function fetchCandidateTrace(identifier: string): Promise<any> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/traces/${identifier}`, { cache: 'no-store' });
-    return await parseResponseOrThrow<any>(res, `Execution trace for '${identifier}' not available`);
-  } catch (err: any) {
-    throw wrapNetworkError(err, `Failed to retrieve execution trace for '${identifier}'`);
-  }
-}
-
 export async function fetchCandidateTranscript(identifier: string): Promise<any> {
   try {
     const res = await fetch(`${API_BASE_URL}/api/transcripts/${identifier}`, { cache: 'no-store' });
@@ -278,6 +269,31 @@ export async function fetchCandidateTranscript(identifier: string): Promise<any>
     return null;
   }
 }
+
+export async function fetchSession(identifier: string): Promise<{
+  meta: Record<string, any>;
+  events: any[];
+  report_markdown?: string | null;
+} | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/sessions/${identifier}`, { cache: 'no-store' });
+    if (res.status === 404) return null;
+    return await parseResponseOrThrow<any>(res, `Session '${identifier}' could not be retrieved`);
+  } catch (err: any) {
+    return null;
+  }
+}
+
+export async function fetchSessions(): Promise<Array<Record<string, any>>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/sessions`, { cache: 'no-store' });
+    const data = await parseResponseOrThrow<{ sessions: Array<Record<string, any>> }>(res, 'Failed to fetch sessions');
+    return data.sessions || [];
+  } catch (err: any) {
+    return [];
+  }
+}
+
 
 
 export async function submitApplication(payload: {

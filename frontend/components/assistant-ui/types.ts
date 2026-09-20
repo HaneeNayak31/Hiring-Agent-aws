@@ -169,12 +169,12 @@ export interface AgentTranscript {
 
 export interface AgentSessionState {
   sessionId: string;
-  status: 'idle' | 'in_progress' | 'failed';
+  status: 'idle' | 'in_progress' | 'completed' | 'failed' | string;
   environment: AgentEnvironmentState;
   model: string;
-  reasoningEffort: string;
-  turns: AgentTurnState[];
-  usage: AgentUsageStats;
+  reasoningEffort?: string;
+  turns: any[];
+  usage: any;
   reportMarkdown?: string;
   reportDownloadUrl?: string;
   transcript?: AgentTranscript | null;

@@ -24,10 +24,10 @@ load_dotenv()
 
 # Internal module imports
 from agent import create_agent_session, download_session_artifacts, REPORTS_DIR
-from otlp_traces import export_session_traces
-from s3_storage import upload_report, upload_trace
-from stream_to_otlp import StreamToOtlpSynthesizer
+from s3_storage import upload_report
 from stream_recorder import StreamRecorder
+import session_store
+
 
 AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 JOBS_TABLE_NAME = os.getenv("DYNAMODB_JOBS_TABLE", "HiringAgent_Jobs")
@@ -161,7 +161,7 @@ def evaluate_candidate_application(
     job_context: Optional[Dict[str, Any]] = None,
     instructions: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Run one coordinator session that delegates one repository per subagent."""
+    """Run an agent session to directly inspect and evaluate candidate repositories."""
     if not repositories:
         raise ValueError("At least one repository is required for inspection.")
 
@@ -180,11 +180,13 @@ def evaluate_candidate_application(
         job_context=job_context,
     )
 
-    synthesizer = StreamToOtlpSynthesizer(
+    # Initialize durable session store
+    session_store.create_session(
         session_id=session_uuid,
-        application_id=application_id,
         repo_url=first_repo_url,
         instructions=instructions,
+        model="gpt-5.6-luna",
+        application_id=application_id,
     )
 
     recorder = StreamRecorder(
@@ -196,29 +198,45 @@ def evaluate_candidate_application(
 
     app_reports_dir = REPORTS_DIR / application_id
     app_reports_dir.mkdir(parents=True, exist_ok=True)
-    managed_session_id = session_uuid
     completed_turn_id = None
+    latest_usage = None
 
     with stream:
         for event in stream:
+            # 1. Record raw event to session store (events.jsonl)
+            session_store.record_event(session_uuid, event)
             recorder.process_event(event)
-            event_data = synthesizer.process_event(event)
-            if not isinstance(event_data, dict):
-                continue
-            managed_session_id = event_data.get("session_id") or managed_session_id
-            event_type = event_data.get("type", "")
+
+            if hasattr(event, "model_dump"):
+                ev_dict = event.model_dump()
+            elif isinstance(event, dict):
+                ev_dict = event
+            elif hasattr(event, "to_dict"):
+                ev_dict = event.to_dict()
+            else:
+                try:
+                    ev_dict = json.loads(json.dumps(event, default=str))
+                except Exception:
+                    ev_dict = {}
+
+            event_type = ev_dict.get("type", "")
             if event_type in ("agent.session.turn.completed", "response.done"):
                 completed_turn_id = (
-                    event_data.get("turn", {}).get("id")
-                    or event_data.get("turn_id")
+                    ev_dict.get("turn", {}).get("id")
+                    or ev_dict.get("turn_id")
                     or completed_turn_id
                 )
-
-    if not managed_session_id:
-        raise RuntimeError("Agents API did not return a managed session ID.")
+                turn_usage = ev_dict.get("usage") or ev_dict.get("turn", {}).get("usage")
+                if turn_usage:
+                    latest_usage = {
+                        "input_tokens": turn_usage.get("input_tokens", 0),
+                        "output_tokens": turn_usage.get("output_tokens", 0),
+                        "reasoning_tokens": turn_usage.get("output_tokens_details", {}).get("reasoning_tokens", 0),
+                        "total_tokens": turn_usage.get("total_tokens", 0),
+                    }
 
     download_session_artifacts(
-        session_id=managed_session_id,
+        session_id=session_uuid,
         turn_id=completed_turn_id,
         destination_dir=app_reports_dir,
     )
@@ -237,49 +255,27 @@ def evaluate_candidate_application(
     report_markdown = report_file.read_text(encoding="utf-8")
     report_s3_url = upload_report(application_id, report_markdown)
 
-    # 1. Primary Rich Multi-Agent Transcript
-    transcript_s3_url = ""
-    try:
-        transcript_doc = recorder.finish()
-        transcript_s3_url = upload_trace(application_id, transcript_doc, filename="session_transcript.json")
-        print(f"[Evaluator] Successfully recorded and uploaded rich multi-agent transcript: {transcript_s3_url}", flush=True)
-
-        # Upload raw stream events audit log
-        raw_events_doc = {"session_id": managed_session_id, "events": recorder.get_raw_events()}
-        upload_trace(application_id, raw_events_doc, filename="session_events.json")
-    except Exception as transcript_err:
-        print(f"[Evaluator] Stream transcript recording warning: {transcript_err}", flush=True)
-
-    # 2. Secondary OTLP Trace (for telemetry backward compatibility)
-    trace_s3_url = ""
-    trace_status = "UNAVAILABLE"
-    try:
-        trace_doc = synthesizer.build_otlp_document()
-        trace_s3_url = upload_trace(application_id, trace_doc, filename="session_trace.otlp.json")
-        trace_status = "EXPORTED"
-        print(f"[Evaluator] Successfully synthesized and uploaded OTLP trace from real-time stream: {trace_s3_url}", flush=True)
-    except Exception as exc:
-        print(f"[Evaluator] Stream OTLP synthesis failed, trying fallback: {exc}", flush=True)
-        try:
-            trace_doc = export_session_traces(managed_session_id)
-            trace_s3_url = upload_trace(application_id, trace_doc, filename="session_trace.otlp.json")
-            trace_status = "EXPORTED"
-        except Exception as fallback_exc:
-            print(f"[Evaluator] Fallback OTLP trace export also unavailable: {fallback_exc}", flush=True)
+    # Complete session in session_store and sync meta.json + events.jsonl to S3
+    session_store.complete_session(
+        session_id=session_uuid,
+        status="completed",
+        usage=latest_usage or recorder.usage,
+        report_file=report_file.name,
+        report_markdown=report_markdown,
+    )
+    s3_session_sync = session_store.sync_to_s3(application_id=application_id, session_id=session_uuid)
+    print(f"[Evaluator] Synced session files to S3: {s3_session_sync}", flush=True)
 
     summary_metrics = {
-        "session_id": managed_session_id,
+        "session_id": session_uuid,
         "repositories_total": len(repositories),
         "repositories": repositories,
-        "transcript_s3_url": transcript_s3_url,
-        "trace_status": trace_status,
         "completed_at": datetime.now(timezone.utc).isoformat(),
     }
     update_application_status(
         application_id=application_id,
         status="EVALUATED",
         report_s3_url=report_s3_url,
-        trace_s3_url=trace_s3_url,
         summary=summary_metrics,
     )
 
@@ -287,10 +283,9 @@ def evaluate_candidate_application(
     return {
         "status": "COMPLETED",
         "application_id": application_id,
-        "session_id": managed_session_id,
+        "session_id": session_uuid,
         "repositories_total": len(repositories),
         "report_s3_url": report_s3_url,
-        "trace_s3_url": trace_s3_url,
     }
 
 
@@ -322,6 +317,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     )
                     processed.append(res)
                 except Exception as exc:
+                    import traceback
+                    traceback.print_exc()
+                    print(f"[Evaluator] Error evaluating application '{app_id}': {exc}", flush=True)
                     update_application_status(app_id, "FAILED", summary={"error": str(exc)})
                     processed.append({"status": "FAILED", "application_id": app_id, "error": str(exc)})
             elif app_id:

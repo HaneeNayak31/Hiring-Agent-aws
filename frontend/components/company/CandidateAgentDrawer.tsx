@@ -21,7 +21,7 @@ export default function CandidateAgentDrawer({
   onClose,
 }: CandidateAgentDrawerProps) {
   const [activeTab, setActiveTab] = useState<'CHAT' | 'REPORT'>('CHAT');
-  const { sessionState, isStreaming, startEvaluation, loadExistingReport, trace, traceLoading } = useAgentEvaluation();
+  const { sessionState, isStreaming, startEvaluation, loadExistingReport } = useAgentEvaluation();
 
   const repoUrl =
     (candidate as any)?.repoUrl ||
@@ -187,8 +187,6 @@ export default function CandidateAgentDrawer({
                     roleTitle={candidate.role}
                     repoUrl={repoUrl}
                     isStreaming={isStreaming}
-                    trace={trace}
-                    traceLoading={traceLoading}
                     onRunEvaluation={(instructions) => startEvaluation(repoUrl, instructions)}
                     onOpenReport={() => setActiveTab('REPORT')}
                   />
