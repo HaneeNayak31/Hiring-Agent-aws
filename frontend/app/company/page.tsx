@@ -184,7 +184,7 @@ export default function CompanyDashboard() {
                           {role.title}
                         </Link>
 
-                        <div className="flex items-center gap-2 mt-3 text-[11px]">
+                        <div className="flex flex-wrap items-center gap-2 mt-3 text-[11px]">
                           {role.requiredSkills.map((sk, sIdx) => (
                             <span key={sIdx} className="px-2.5 py-0.5 border border-white/10 bg-white/[0.03] text-white/70">
                               {sk}
